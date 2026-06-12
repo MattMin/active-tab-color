@@ -13,13 +13,11 @@ import com.matt.activetabcolor.settings.ActiveTabColorSettingsState;
 
 import javax.swing.JComponent;
 import javax.swing.border.Border;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
 import java.awt.RenderingHints;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 public final class ActiveTabColorDecorator {
@@ -36,11 +34,8 @@ public final class ActiveTabColorDecorator {
       if (project.isDisposed()) {
         return;
       }
-      FileEditorManagerEx manager = FileEditorManagerEx.getInstanceEx(project);
-      JComponent component = manager == null ? null : manager.getComponent();
-      if (component != null) {
-        refreshComponent(component);
-      }
+      JComponent component = FileEditorManagerEx.getInstanceEx(project).getComponent();
+      refreshComponent(component);
     };
 
     if (ApplicationManager.getApplication().isDispatchThread()) {
@@ -63,11 +58,11 @@ public final class ActiveTabColorDecorator {
   }
 
   private static void refreshComponent(Component component) {
-    if (component instanceof TabLabel) {
-      refreshTabLabel((TabLabel)component);
+    if (component instanceof TabLabel label) {
+      refreshTabLabel(label);
     }
-    if (component instanceof java.awt.Container) {
-      Component[] children = ((java.awt.Container)component).getComponents();
+    if (component instanceof java.awt.Container container) {
+      Component[] children = container.getComponents();
       for (Component child : children) {
         refreshComponent(child);
       }
@@ -78,7 +73,7 @@ public final class ActiveTabColorDecorator {
     ActiveTabColorSettingsState.PluginState state = ActiveTabColorSettingsState.getInstance().getState();
     String tabName = label.getInfo().getText();
     boolean active = isSelected(label);
-    TabStyle style = TabStyleResolver.resolve(state, tabName == null ? "" : tabName, active);
+    TabStyle style = TabStyleResolver.resolve(state, tabName, active);
 
     Integer backgroundRgb = style.getBackgroundRgb();
     Integer underlineRgb = style.getUnderlineBorderRgb();
@@ -105,8 +100,8 @@ public final class ActiveTabColorDecorator {
   private static JBTabsImpl findTabs(Component component) {
     Component current = component.getParent();
     while (current != null) {
-      if (current instanceof JBTabsImpl) {
-        return (JBTabsImpl)current;
+      if (current instanceof JBTabsImpl tabs) {
+        return tabs;
       }
       current = current.getParent();
     }
@@ -137,17 +132,14 @@ public final class ActiveTabColorDecorator {
     }
   }
 
-  private static final class ActiveTabOverlayBorder implements Border {
-    private final Border delegate;
-    private final Integer backgroundRgb;
-    private final Integer underlineRgb;
-    private final Integer outlineRgb;
-
-    private ActiveTabOverlayBorder(Border delegate, Integer backgroundRgb, Integer underlineRgb, Integer outlineRgb) {
-      this.delegate = delegate;
-      this.backgroundRgb = ActiveTabColorSettingsState.normalizeRgb(backgroundRgb);
-      this.underlineRgb = ActiveTabColorSettingsState.normalizeRgb(underlineRgb);
-      this.outlineRgb = ActiveTabColorSettingsState.normalizeRgb(outlineRgb);
+  private record ActiveTabOverlayBorder(Border delegate,
+                                        Integer backgroundRgb,
+                                        Integer underlineRgb,
+                                        Integer outlineRgb) implements Border {
+    private ActiveTabOverlayBorder {
+      backgroundRgb = ActiveTabColorSettingsState.normalizeRgb(backgroundRgb);
+      underlineRgb = ActiveTabColorSettingsState.normalizeRgb(underlineRgb);
+      outlineRgb = ActiveTabColorSettingsState.normalizeRgb(outlineRgb);
     }
 
     @Override
@@ -168,7 +160,8 @@ public final class ActiveTabColorDecorator {
         int lineHeight = Math.max(1, JBUI.scale(2));
         g.setColor(ColorUtil.fromRgb(underlineRgb));
         int inset = JBUI.scale(6);
-        g.fillRoundRect(x + inset, y + height - lineHeight - JBUI.scale(2), width - inset * 2, lineHeight, lineHeight, lineHeight);
+        int arc = JBUI.scale(4);
+        g.fillRoundRect(x + inset, y + height - lineHeight - JBUI.scale(2), width - inset * 2, lineHeight, arc, arc);
       }
     }
 
@@ -195,22 +188,6 @@ public final class ActiveTabColorDecorator {
     @Override
     public boolean isBorderOpaque() {
       return false;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) return true;
-      if (!(o instanceof ActiveTabOverlayBorder)) return false;
-      ActiveTabOverlayBorder that = (ActiveTabOverlayBorder)o;
-      return Objects.equals(delegate, that.delegate) &&
-             Objects.equals(backgroundRgb, that.backgroundRgb) &&
-             Objects.equals(underlineRgb, that.underlineRgb) &&
-             Objects.equals(outlineRgb, that.outlineRgb);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(delegate, backgroundRgb, underlineRgb, outlineRgb);
     }
   }
 }

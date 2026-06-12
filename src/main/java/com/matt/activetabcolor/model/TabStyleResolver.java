@@ -48,7 +48,7 @@ public final class TabStyleResolver {
       if (rule == null || !rule.enabled || rule.pattern == null || rule.pattern.isBlank()) {
         continue;
       }
-      Pattern.compile(rule.pattern);
+      validatePattern(rule.pattern);
     }
   }
 
@@ -75,6 +75,11 @@ public final class TabStyleResolver {
     catch (PatternSyntaxException ignored) {
       return false;
     }
+  }
+
+  @SuppressWarnings("ResultOfMethodCallIgnored")
+  private static void validatePattern(String pattern) {
+    Pattern.compile(pattern);
   }
 
   private static @NotNull TabStyle toStyle(ActiveTabColorSettingsState.ColorSettings settings) {

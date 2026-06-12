@@ -3,6 +3,7 @@ package com.matt.activetabcolor.settings;
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.ui.ColorPanel;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBList;
 import com.intellij.ui.components.JBScrollPane;
@@ -29,11 +30,9 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
-import java.awt.Insets;
 import java.util.Objects;
 import java.util.regex.PatternSyntaxException;
 
@@ -350,7 +349,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
 
   private GridBagConstraints baseConstraints() {
     GridBagConstraints c = new GridBagConstraints();
-    c.insets = new Insets(2, 4, 2, 4);
+    c.insets = JBUI.insets(2, 4);
     c.anchor = GridBagConstraints.WEST;
     return c;
   }
@@ -416,18 +415,17 @@ public final class ActiveTabColorConfigurable implements Configurable {
 
     private final JPanel panel = new JPanel(new GridBagLayout());
     private final JCheckBox useCheckBox = new JBCheckBox();
-    private final JLabel label;
     private final ColorPanel colorPanel = new ColorPanel();
     private final JButton clearButton = new JButton("Clear");
     private Runnable onChange;
 
     private ColorRow(String label) {
-      this.label = new JLabel(label);
+      JLabel labelComponent = new JLabel(label);
       panel.setMinimumSize(new Dimension(0, 0));
       colorPanel.setEditable(true);
       useCheckBox.addActionListener(e -> {
         if (useCheckBox.isSelected() && colorPanel.getSelectedColor() == null) {
-          colorPanel.setSelectedColor(new Color(DEFAULT_RGB));
+          colorPanel.setSelectedColor(new JBColor(DEFAULT_RGB, DEFAULT_RGB));
         }
         updateEnabled();
         notifyChanged();
@@ -447,13 +445,13 @@ public final class ActiveTabColorConfigurable implements Configurable {
       });
 
       GridBagConstraints c = new GridBagConstraints();
-      c.insets = new Insets(2, 2, 2, 2);
+      c.insets = JBUI.insets(2);
       c.anchor = GridBagConstraints.WEST;
       c.gridx = 0;
       panel.add(useCheckBox, c);
       c.gridx = 1;
-      this.label.setPreferredSize(JBUI.size(112, this.label.getPreferredSize().height));
-      panel.add(this.label, c);
+      labelComponent.setPreferredSize(JBUI.size(112, labelComponent.getPreferredSize().height));
+      panel.add(labelComponent, c);
       c.gridx = 2;
       panel.add(colorPanel, c);
       c.gridx = 3;

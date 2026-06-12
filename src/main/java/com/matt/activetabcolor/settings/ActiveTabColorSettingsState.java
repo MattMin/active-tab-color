@@ -56,9 +56,12 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (!(o instanceof PluginState)) return false;
-      PluginState that = (PluginState)o;
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof PluginState that)) {
+        return false;
+      }
       return enabled == that.enabled &&
              Objects.equals(active, that.active) &&
              Objects.equals(rules, that.rules);
@@ -72,11 +75,6 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
 
   public static class ColorSettings {
     public @Nullable Integer backgroundRgb;
-    /**
-     * Kept only so old persisted settings can be read without errors.
-     * Foreground customization is intentionally ignored to preserve IDE/VCS tab text colors.
-     */
-    public @Nullable Integer foregroundRgb;
     public @Nullable Integer underlineBorderRgb;
     public @Nullable Integer outlineBorderRgb;
 
@@ -96,9 +94,12 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (!(o instanceof ColorSettings)) return false;
-      ColorSettings that = (ColorSettings)o;
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof ColorSettings that)) {
+        return false;
+      }
       return Objects.equals(backgroundRgb, that.backgroundRgb) &&
              Objects.equals(underlineBorderRgb, that.underlineBorderRgb) &&
              Objects.equals(outlineBorderRgb, that.outlineBorderRgb);
@@ -129,10 +130,15 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (!(o instanceof TabColorRule)) return false;
-      if (!super.equals(o)) return false;
-      TabColorRule that = (TabColorRule)o;
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof TabColorRule that)) {
+        return false;
+      }
+      if (!super.equals(o)) {
+        return false;
+      }
       return enabled == that.enabled &&
              Objects.equals(name, that.name) &&
              Objects.equals(pattern, that.pattern);

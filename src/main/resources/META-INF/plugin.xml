@@ -1,11 +1,13 @@
 <idea-plugin>
     <id>com.matt.active-tab-color</id>
     <name>Active Tab Color</name>
-    <vendor>Matt</vendor>
+    <vendor email="mzyupc@163.com" url="https://github.com/MattMin">MattMin</vendor>
 
     <description><![CDATA[
         Customize editor tab colors with active tab settings and regex-based tab name rules.
     ]]></description>
+
+    <resource-bundle>messages.ActiveTabColorBundle</resource-bundle>
 
     <depends>com.intellij.modules.platform</depends>
 
@@ -14,7 +16,8 @@
                 id="com.matt.activetabcolor.settings"
                 parentId="tools"
                 instance="com.matt.activetabcolor.settings.ActiveTabColorConfigurable"
-                displayName="Active Tab Color"/>
+                bundle="messages.ActiveTabColorBundle"
+                key="active.tab.color.settings.display.name"/>
         <editorTabColorProvider implementation="com.matt.activetabcolor.ui.ActiveTabColorProvider"/>
         <postStartupActivity implementation="com.matt.activetabcolor.ui.ActiveTabColorStartupActivity"/>
     </extensions>
