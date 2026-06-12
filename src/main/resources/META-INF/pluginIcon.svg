@@ -41,7 +41,7 @@
                 0 0 0 0 0.45
                 0 0 0 0 1
                 0 0 0 0.7 0"/>
-      <feBlend in="SourceGraphic"/>
+<!--      <feBlend in="SourceGraphic"/>-->
     </filter>
   </defs>
 
