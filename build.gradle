@@ -1,0 +1,60 @@
+plugins {
+    id 'java'
+    id 'org.jetbrains.intellij.platform' version '2.13.1'
+}
+
+group = 'com.matt'
+version = '0.1.4'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://plugins.gradle.org/m2/' }
+    intellijPlatform {
+        defaultRepositories()
+    }
+}
+
+dependencies {
+    intellijPlatform {
+        intellijIdeaCommunity('2024.1.7')
+        pluginVerifier()
+    }
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+patchPluginXml {
+    sinceBuild = '241.19416.15'
+    untilBuild = provider { null }
+    changeNotes = """
+      <ul>
+        <li>Initial version with active tab colors and regex-based tab color rules.</li>
+      </ul>
+    """
+}
+
+test {
+    useJUnitPlatform()
+}
+
+intellijPlatform {
+    buildSearchableOptions = false
+
+    pluginVerification {
+        ides {
+            recommended()
+        }
+    }
+}

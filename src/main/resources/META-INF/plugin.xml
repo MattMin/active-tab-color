@@ -1,0 +1,26 @@
+<idea-plugin>
+    <id>com.matt.active-tab-color</id>
+    <name>Active Tab Color</name>
+    <vendor>Matt</vendor>
+
+    <description><![CDATA[
+        Customize editor tab colors with active tab settings and regex-based tab name rules.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationConfigurable
+                id="com.matt.activetabcolor.settings"
+                parentId="tools"
+                instance="com.matt.activetabcolor.settings.ActiveTabColorConfigurable"
+                displayName="Active Tab Color"/>
+        <editorTabColorProvider implementation="com.matt.activetabcolor.ui.ActiveTabColorProvider"/>
+        <postStartupActivity implementation="com.matt.activetabcolor.ui.ActiveTabColorStartupActivity"/>
+    </extensions>
+
+    <projectListeners>
+        <listener class="com.matt.activetabcolor.ui.ActiveTabColorFileEditorListener"
+                  topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
+    </projectListeners>
+</idea-plugin>
