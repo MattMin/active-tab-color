@@ -10,7 +10,7 @@ import org.jetbrains.annotations.NotNull;
 public final class ActiveTabColorFileEditorListener implements FileEditorManagerListener {
   @Override
   public void fileOpened(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
-    ActiveTabColorRefresh.refreshProject(source.getProject());
+    ActiveTabColorRefresh.refreshFile(source.getProject(), file);
   }
 
   @Override
@@ -21,8 +21,6 @@ public final class ActiveTabColorFileEditorListener implements FileEditorManager
   @Override
   public void selectionChanged(@NotNull FileEditorManagerEvent event) {
     Project project = event.getManager().getProject();
-    ActiveTabColorRefresh.refreshFile(project, event.getOldFile());
-    ActiveTabColorRefresh.refreshFile(project, event.getNewFile());
-    ActiveTabColorDecorator.refreshProject(project);
+    ActiveTabColorRefresh.refreshSelection(project, event.getOldFile(), event.getNewFile());
   }
 }

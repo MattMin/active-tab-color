@@ -5,6 +5,7 @@
 
     <description><![CDATA[
         Customize editor tab colors with active tab settings and regex-based tab name rules.
+        Repository: https://github.com/MattMin/active-tab-color
     ]]></description>
 
     <resource-bundle>messages.ActiveTabColorBundle</resource-bundle>
