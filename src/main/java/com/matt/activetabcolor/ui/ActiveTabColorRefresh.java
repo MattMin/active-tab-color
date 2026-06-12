@@ -47,14 +47,21 @@ public final class ActiveTabColorRefresh {
     if (project == null || project.isDisposed()) {
       return;
     }
-    requestRefresh(project, pending -> {
-      if (oldFile != null) {
-        pending.files.add(oldFile);
+    Runnable refresh = () -> {
+      if (project.isDisposed()) {
+        return;
       }
-      if (newFile != null) {
-        pending.files.add(newFile);
-      }
-    });
+      FileEditorManager manager = FileEditorManager.getInstance(project);
+      updateFile(manager, oldFile);
+      updateFile(manager, newFile);
+      ActiveTabColorDecorator.refreshSelection(project);
+    };
+    if (ApplicationManager.getApplication().isDispatchThread()) {
+      refresh.run();
+    }
+    else {
+      ApplicationManager.getApplication().invokeLater(refresh);
+    }
   }
 
   private static void requestRefresh(Project project, Consumer<PendingRefresh> update) {

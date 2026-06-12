@@ -3,8 +3,8 @@ package com.matt.activetabcolor.ui;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx;
 import com.intellij.openapi.project.Project;
-import com.intellij.ui.tabs.impl.JBTabsImpl;
-import com.intellij.ui.tabs.impl.TabLabel;
+import com.intellij.ui.tabs.JBTabs;
+import com.intellij.ui.tabs.TabInfo;
 import com.intellij.util.concurrency.EdtExecutorService;
 import com.intellij.util.ui.JBUI;
 import com.matt.activetabcolor.model.TabStyle;
@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 public final class ActiveTabColorDecorator {
   private static final String ORIGINAL_BORDER_KEY = "activeTabColor.originalBorder";
+  private static final String LAST_SELECTED_INFO_KEY = "activeTabColor.lastSelectedInfo";
 
   private ActiveTabColorDecorator() {
   }
@@ -57,9 +58,30 @@ public final class ActiveTabColorDecorator {
     );
   }
 
+  public static void refreshSelection(Project project) {
+    if (project == null || project.isDisposed()) {
+      return;
+    }
+    Runnable refresh = () -> {
+      if (project.isDisposed()) {
+        return;
+      }
+      JComponent component = FileEditorManagerEx.getInstanceEx(project).getComponent();
+      refreshSelectionComponent(component);
+    };
+
+    if (ApplicationManager.getApplication().isDispatchThread()) {
+      refresh.run();
+    }
+    else {
+      ApplicationManager.getApplication().invokeLater(refresh);
+    }
+  }
+
   private static void refreshComponent(Component component) {
-    if (component instanceof TabLabel label) {
-      refreshTabLabel(label);
+    if (component instanceof JBTabs tabs) {
+      refreshTabs(tabs);
+      return;
     }
     if (component instanceof java.awt.Container container) {
       Component[] children = container.getComponents();
@@ -69,10 +91,74 @@ public final class ActiveTabColorDecorator {
     }
   }
 
-  private static void refreshTabLabel(TabLabel label) {
+  private static void refreshTabs(JBTabs tabs) {
     ActiveTabColorSettingsState.PluginState state = ActiveTabColorSettingsState.getInstance().getState();
-    String tabName = label.getInfo().getText();
-    boolean active = isSelected(label);
+    TabInfo selectedInfo = tabs.getSelectedInfo();
+    for (TabInfo tabInfo : tabs.getTabs()) {
+      Component label = tabs.getTabLabel(tabInfo);
+      if (label instanceof JComponent labelComponent) {
+        refreshTabLabel(labelComponent, tabInfo, tabInfo == selectedInfo, state);
+      }
+    }
+    rememberSelectedInfo(tabs, selectedInfo);
+  }
+
+  private static void refreshSelectionComponent(Component component) {
+    if (component instanceof JBTabs tabs) {
+      refreshSelectedTabs(tabs);
+      return;
+    }
+    if (component instanceof java.awt.Container container) {
+      Component[] children = container.getComponents();
+      for (Component child : children) {
+        refreshSelectionComponent(child);
+      }
+    }
+  }
+
+  private static void refreshSelectedTabs(JBTabs tabs) {
+    TabInfo selectedInfo = tabs.getSelectedInfo();
+    TabInfo previousInfo = getLastSelectedInfo(tabs);
+    if (previousInfo == null) {
+      refreshTabs(tabs);
+      return;
+    }
+
+    ActiveTabColorSettingsState.PluginState state = ActiveTabColorSettingsState.getInstance().getState();
+    refreshTabInfo(tabs, previousInfo, false, state);
+    if (selectedInfo != previousInfo) {
+      refreshTabInfo(tabs, selectedInfo, true, state);
+    }
+    rememberSelectedInfo(tabs, selectedInfo);
+  }
+
+  private static void refreshTabInfo(JBTabs tabs,
+                                     TabInfo tabInfo,
+                                     boolean active,
+                                     ActiveTabColorSettingsState.PluginState state) {
+    if (tabInfo == null || !tabs.getTabs().contains(tabInfo)) {
+      return;
+    }
+    Component label = tabs.getTabLabel(tabInfo);
+    if (label instanceof JComponent labelComponent) {
+      refreshTabLabel(labelComponent, tabInfo, active, state);
+    }
+  }
+
+  private static TabInfo getLastSelectedInfo(JBTabs tabs) {
+    Object saved = tabs.getComponent().getClientProperty(LAST_SELECTED_INFO_KEY);
+    return saved instanceof TabInfo ? (TabInfo)saved : null;
+  }
+
+  private static void rememberSelectedInfo(JBTabs tabs, TabInfo selectedInfo) {
+    tabs.getComponent().putClientProperty(LAST_SELECTED_INFO_KEY, selectedInfo);
+  }
+
+  private static void refreshTabLabel(JComponent label,
+                                      TabInfo tabInfo,
+                                      boolean active,
+                                      ActiveTabColorSettingsState.PluginState state) {
+    String tabName = tabInfo.getText();
     TabStyle style = TabStyleResolver.resolve(state, tabName, active);
 
     Integer backgroundRgb = style.getBackgroundRgb();
@@ -92,23 +178,7 @@ public final class ActiveTabColorDecorator {
     label.repaint();
   }
 
-  private static boolean isSelected(TabLabel label) {
-    JBTabsImpl tabs = findTabs(label);
-    return tabs != null && label.getInfo() == tabs.getSelectedInfo();
-  }
-
-  private static JBTabsImpl findTabs(Component component) {
-    Component current = component.getParent();
-    while (current != null) {
-      if (current instanceof JBTabsImpl tabs) {
-        return tabs;
-      }
-      current = current.getParent();
-    }
-    return null;
-  }
-
-  private static Border getOriginalBorder(TabLabel label, Border current) {
+  private static Border getOriginalBorder(JComponent label, Border current) {
     Object saved = label.getClientProperty(ORIGINAL_BORDER_KEY);
     if (saved instanceof Border || saved == null) {
       if (current instanceof ActiveTabOverlayBorder) {
@@ -120,7 +190,7 @@ public final class ActiveTabColorDecorator {
     return current;
   }
 
-  private static void restoreOriginalBorder(TabLabel label) {
+  private static void restoreOriginalBorder(JComponent label) {
     Object saved = label.getClientProperty(ORIGINAL_BORDER_KEY);
     if (saved instanceof Border || saved == null) {
       Border current = label.getBorder();
