@@ -2,6 +2,8 @@
 
 [中文文档](README.zh-CN.md)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Active Tab Color is an IntelliJ Platform-based plugin for customizing editor tab colors. It can style the active tab separately, and it can also apply color rules to tabs whose displayed names match a regular expression.
 
 ![Settings](img/settings.png)
@@ -111,3 +113,7 @@ Run unit tests:
 ```bash
 JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-17.58.21.jdk/Contents/Home ./gradlew test
 ```
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

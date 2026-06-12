@@ -2,6 +2,8 @@
 
 [English](README.md)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Active Tab Color 是一个 IntelliJ-based 插件，用于自定义编辑器 tab 的颜色。它既可以为当前选中的 active tab 设置专属样式，也可以通过正则规则为符合名称的 tab 批量设置样式。
 
 ![Settings](img/settings.png)
@@ -113,3 +115,7 @@ build/distributions/
 ```bash
 JAVA_HOME=/Library/Java/JavaVirtualMachines/zulu-17.58.21.jdk/Contents/Home ./gradlew test
 ```
+
+## 开源许可证
+
+本项目使用 [MIT License](LICENSE) 开源。
