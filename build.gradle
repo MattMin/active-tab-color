@@ -3,6 +3,8 @@ plugins {
     id 'org.jetbrains.intellij.platform' version '2.13.1'
 }
 
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+
 group = 'com.matt'
 version = '0.1.5'
 
@@ -51,4 +53,10 @@ test {
 
 intellijPlatform {
     buildSearchableOptions = false
+
+    pluginVerification {
+        ides {
+            recommended()
+        }
+    }
 }
