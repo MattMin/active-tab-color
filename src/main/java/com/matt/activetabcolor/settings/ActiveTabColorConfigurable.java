@@ -17,9 +17,11 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComponent;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -33,12 +35,17 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Image;
+import java.net.URL;
 import java.util.Objects;
 import java.util.regex.PatternSyntaxException;
 
 public final class ActiveTabColorConfigurable implements Configurable {
   private JPanel rootPanel;
   private JCheckBox enabledCheckBox;
+  private JCheckBox showTabCatCheckBox;
+  private JComboBox<CatOption> tabCatComboBox;
+  private JLabel tabCatPreviewLabel;
   private ColorRow activeBackground;
   private ColorRow activeUnderline;
   private ColorRow activeOutline;
@@ -62,8 +69,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     rootPanel = new JPanel(new BorderLayout());
     rootPanel.setBorder(JBUI.Borders.empty(8));
 
-    enabledCheckBox = new JBCheckBox("Enable tab color customization");
-    rootPanel.add(enabledCheckBox, BorderLayout.NORTH);
+    rootPanel.add(createTopPanel(), BorderLayout.NORTH);
 
     JPanel content = new JPanel(new BorderLayout(JBUI.scale(12), 0));
     content.add(createActivePanel(), BorderLayout.NORTH);
@@ -99,6 +105,9 @@ public final class ActiveTabColorConfigurable implements Configurable {
     }
     ActiveTabColorSettingsState.PluginState state = ActiveTabColorSettingsState.getInstance().getState().copy();
     enabledCheckBox.setSelected(state.enabled);
+    showTabCatCheckBox.setSelected(state.showTabCat);
+    selectTabCat(state.tabCat);
+    updateTabCatControls();
     activeBackground.setRgb(state.active.backgroundRgb);
     activeUnderline.setRgb(state.active.underlineBorderRgb);
     activeOutline.setRgb(state.active.outlineBorderRgb);
@@ -134,6 +143,73 @@ public final class ActiveTabColorConfigurable implements Configurable {
     addColorRow(panel, activeOutline, 2);
     addVerticalFiller(panel, 3);
     return panel;
+  }
+
+  private JComponent createTopPanel() {
+    JPanel panel = new JPanel(new GridBagLayout());
+    enabledCheckBox = new JBCheckBox("Enable tab color customization");
+    showTabCatCheckBox = new JBCheckBox("Show tab cat");
+    tabCatComboBox = new JComboBox<>(CatOption.ALL);
+    tabCatComboBox.setPreferredSize(JBUI.size(120, tabCatComboBox.getPreferredSize().height));
+    tabCatComboBox.setMinimumSize(JBUI.size(90, tabCatComboBox.getMinimumSize().height));
+    tabCatPreviewLabel = new JLabel();
+    showTabCatCheckBox.addActionListener(e -> updateTabCatControls());
+    tabCatComboBox.addActionListener(e -> updateTabCatPreview());
+
+    GridBagConstraints c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 0;
+    c.gridwidth = 3;
+    c.fill = GridBagConstraints.HORIZONTAL;
+    c.weightx = 1;
+    panel.add(showTabCatCheckBox, c);
+
+    c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 1;
+    panel.add(new JLabel("Tab cat"), c);
+
+    c = baseConstraints();
+    c.gridx = 1;
+    c.gridy = 1;
+    panel.add(tabCatComboBox, c);
+
+    c = baseConstraints();
+    c.gridx = 2;
+    c.gridy = 1;
+    panel.add(tabCatPreviewLabel, c);
+
+    c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 2;
+    c.gridwidth = 3;
+    c.fill = GridBagConstraints.HORIZONTAL;
+    c.weightx = 1;
+    panel.add(enabledCheckBox, c);
+    return panel;
+  }
+
+  private void selectTabCat(String tabCat) {
+    String normalized = ActiveTabColorSettingsState.normalizeTabCat(tabCat);
+    for (CatOption option : CatOption.ALL) {
+      if (option.id.equals(normalized)) {
+        tabCatComboBox.setSelectedItem(option);
+        return;
+      }
+    }
+    tabCatComboBox.setSelectedItem(CatOption.ALL[0]);
+  }
+
+  private void updateTabCatControls() {
+    boolean enabled = showTabCatCheckBox.isSelected();
+    tabCatComboBox.setEnabled(enabled);
+    tabCatPreviewLabel.setEnabled(enabled);
+    updateTabCatPreview();
+  }
+
+  private void updateTabCatPreview() {
+    CatOption option = (CatOption)tabCatComboBox.getSelectedItem();
+    tabCatPreviewLabel.setIcon(option == null ? null : option.previewIcon());
   }
 
   private JComponent createRulesPanel() {
@@ -302,6 +378,9 @@ public final class ActiveTabColorConfigurable implements Configurable {
   private ActiveTabColorSettingsState.PluginState readStateFromUi() {
     ActiveTabColorSettingsState.PluginState state = new ActiveTabColorSettingsState.PluginState();
     state.enabled = enabledCheckBox.isSelected();
+    state.showTabCat = showTabCatCheckBox.isSelected();
+    CatOption tabCat = (CatOption)tabCatComboBox.getSelectedItem();
+    state.tabCat = tabCat == null ? ActiveTabColorSettingsState.DEFAULT_TAB_CAT : tabCat.id;
     state.active.backgroundRgb = activeBackground.getRgb();
     state.active.underlineBorderRgb = activeUnderline.getRgb();
     state.active.outlineBorderRgb = activeOutline.getRgb();
@@ -407,6 +486,52 @@ public final class ActiveTabColorConfigurable implements Configurable {
     public String toString() {
       String displayName = name == null || name.isBlank() ? "Unnamed rule" : name;
       return (enabled ? "" : "[Disabled] ") + displayName;
+    }
+  }
+
+  private static final class CatOption {
+    private static final CatOption[] ALL = {
+      new CatOption("timi", "Timi"),
+      new CatOption("luna", "Luna"),
+      new CatOption("siri", "Siri")
+    };
+
+    private final String id;
+    private final String displayName;
+    private ImageIcon previewIcon;
+
+    private CatOption(String id, String displayName) {
+      this.id = id;
+      this.displayName = displayName;
+    }
+
+    private ImageIcon previewIcon() {
+      if (previewIcon == null) {
+        URL resource = ActiveTabColorConfigurable.class.getResource("/icons/cat/" + id + "/sit.png");
+        if (resource != null) {
+          ImageIcon sourceIcon = new ImageIcon(resource);
+          Dimension previewSize = scaledSize(sourceIcon.getIconWidth(), sourceIcon.getIconHeight(), JBUI.scale(52), JBUI.scale(38));
+          Image image = sourceIcon.getImage().getScaledInstance(previewSize.width, previewSize.height, Image.SCALE_SMOOTH);
+          previewIcon = new ImageIcon(image);
+        }
+        else {
+          previewIcon = new ImageIcon();
+        }
+      }
+      return previewIcon;
+    }
+
+    private static Dimension scaledSize(int width, int height, int maxWidth, int maxHeight) {
+      if (width <= 0 || height <= 0) {
+        return JBUI.size(maxWidth, maxHeight);
+      }
+      double scale = Math.min(maxWidth / (double)width, maxHeight / (double)height);
+      return JBUI.size(Math.max(1, (int)Math.round(width * scale)), Math.max(1, (int)Math.round(height * scale)));
+    }
+
+    @Override
+    public String toString() {
+      return displayName;
     }
   }
 

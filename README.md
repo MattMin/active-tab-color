@@ -6,6 +6,8 @@
 
 Active Tab Color is an IntelliJ Platform-based plugin for customizing editor tab colors. It can style the active tab separately, and it can also apply color rules to tabs whose displayed names match a regular expression.
 
+It also includes an optional Tab Cat companion that walks, runs, sits, and blinks on the editor tab bar.
+
 ![Settings](img/settings.png)
 
 ## Compatibility
@@ -24,6 +26,8 @@ The plugin has been verified with IntelliJ IDEA Community `2024.1.7` and Intelli
 - Add multiple tab color rules based on regular expressions.
 - Enable, disable, delete, move up, or move down rules.
 - Configure background, underline border, and outline border colors independently for each rule.
+- Show or hide an optional animated tab cat companion.
+- Choose the tab cat sprite set: Timi, Luna, or Siri.
 - The plugin does not change tab appearance by default. Colors are applied only after you manually enable a color item and choose a color.
 
 ## Settings
@@ -32,6 +36,28 @@ After installing the plugin, open:
 
 ```text
 Settings > Tools > Active Tab Color
+```
+
+## Tab Cat
+
+The `Show tab cat` option enables an animated cat on the editor tab bar.
+
+- `Tab cat`: choose between `Timi`, `Luna`, and `Siri`.
+- The preview next to the selector shows the selected cat.
+- The cat walks to nearby active tabs and runs to farther active tabs.
+- After reaching the active tab, the cat sits and blinks occasionally.
+- If the tab bar moves because tool windows open, close, or resize, the cat recalculates the active tab position.
+
+You can also toggle the tab cat from:
+
+```text
+Tools > Show Tab Cat
+```
+
+Default shortcut:
+
+```text
+Ctrl+Alt+Shift+C
 ```
 
 ## Active Tab Settings

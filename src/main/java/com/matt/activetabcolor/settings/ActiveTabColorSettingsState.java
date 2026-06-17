@@ -16,6 +16,7 @@ import java.util.Objects;
 @Service(Level.APP)
 @State(name = "ActiveTabColorSettings", storages = @Storage("activeTabColor.xml"))
 public final class ActiveTabColorSettingsState implements PersistentStateComponent<ActiveTabColorSettingsState.PluginState> {
+  public static final String DEFAULT_TAB_CAT = "timi";
   private PluginState state = new PluginState();
 
   public static ActiveTabColorSettingsState getInstance() {
@@ -38,12 +39,16 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
 
   public static final class PluginState {
     public boolean enabled = true;
+    public boolean showTabCat;
+    public String tabCat = DEFAULT_TAB_CAT;
     public ColorSettings active = new ColorSettings();
     public List<TabColorRule> rules = new ArrayList<>();
 
     public PluginState copy() {
       PluginState copy = new PluginState();
       copy.enabled = enabled;
+      copy.showTabCat = showTabCat;
+      copy.tabCat = normalizeTabCat(tabCat);
       copy.active = active == null ? new ColorSettings() : active.copy();
       copy.rules = new ArrayList<>();
       if (rules != null) {
@@ -63,13 +68,15 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
         return false;
       }
       return enabled == that.enabled &&
+             showTabCat == that.showTabCat &&
+             Objects.equals(normalizeTabCat(tabCat), normalizeTabCat(that.tabCat)) &&
              Objects.equals(active, that.active) &&
              Objects.equals(rules, that.rules);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(enabled, active, rules);
+      return Objects.hash(enabled, showTabCat, normalizeTabCat(tabCat), active, rules);
     }
   }
 
@@ -152,5 +159,15 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
 
   public static @Nullable Integer normalizeRgb(@Nullable Integer rgb) {
     return rgb == null ? null : rgb & 0x00FFFFFF;
+  }
+
+  public static @NotNull String normalizeTabCat(@Nullable String tabCat) {
+    if ("siri".equals(tabCat)) {
+      return "siri";
+    }
+    if ("luna".equals(tabCat)) {
+      return "luna";
+    }
+    return DEFAULT_TAB_CAT;
   }
 }

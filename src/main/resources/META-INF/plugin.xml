@@ -27,4 +27,14 @@
         <listener class="com.matt.activetabcolor.ui.ActiveTabColorFileEditorListener"
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
     </projectListeners>
+
+    <actions>
+        <action id="com.matt.activetabcolor.ToggleTabCat"
+                class="com.matt.activetabcolor.ui.ToggleTabCatAction"
+                text="Show Tab Cat"
+                description="Show or hide the editor tab cat">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift C"/>
+        </action>
+    </actions>
 </idea-plugin>

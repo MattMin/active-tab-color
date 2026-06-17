@@ -6,7 +6,7 @@ plugins {
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 
 group = 'com.matt'
-version = '0.1.5'
+version = '0.1.6'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -42,7 +42,10 @@ patchPluginXml {
     untilBuild = provider { null }
     changeNotes = """
       <ul>
-        <li>Initial version with active tab colors and regex-based tab color rules.</li>
+        <li>Add optional Tab Cat companion with Timi, Luna, and Siri sprite sets.</li>
+        <li>Add walking, running, sitting, and blink animations for the tab cat.</li>
+        <li>Add Settings and keyboard shortcut support for showing or hiding the tab cat.</li>
+        <li>Keep active tab color customization and regex-based tab color rules.</li>
       </ul>
     """
 }
