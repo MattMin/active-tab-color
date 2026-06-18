@@ -134,7 +134,9 @@ public final class ActiveTabCatDecorator {
 
   private static final class CatOverlay extends JComponent {
     private final JComponent tabsComponent;
-    private final Timer timer;
+    private final Timer animationTimer;
+    private final Timer blinkStartTimer;
+    private final Timer blinkFinishTimer;
     private final ComponentAdapter componentListener;
     private final HierarchyBoundsAdapter hierarchyBoundsListener;
     private JLayeredPane layeredPane;
@@ -145,8 +147,6 @@ public final class ActiveTabCatDecorator {
     private int targetY;
     private int direction = 1;
     private int animationFrame;
-    private long settledAtMillis;
-    private long blinkStartedAtMillis;
     private boolean initialized;
     private boolean refreshScheduled;
     private CatPose pose = CatPose.SITTING;
@@ -155,7 +155,11 @@ public final class ActiveTabCatDecorator {
       this.tabsComponent = tabsComponent;
       setOpaque(false);
       setFocusable(false);
-      timer = new Timer(TIMER_DELAY_MILLIS, e -> animate());
+      animationTimer = new Timer(TIMER_DELAY_MILLIS, e -> animate());
+      blinkStartTimer = new Timer(BLINK_AFTER_MILLIS, e -> startBlink());
+      blinkStartTimer.setRepeats(false);
+      blinkFinishTimer = new Timer(BLINK_DURATION_MILLIS, e -> finishBlink());
+      blinkFinishTimer.setRepeats(false);
       componentListener = new ComponentAdapter() {
         @Override
         public void componentMoved(ComponentEvent e) {
@@ -202,9 +206,9 @@ public final class ActiveTabCatDecorator {
       Point target = findCatTarget(tabs, pane);
       if (target == null) {
         setVisible(false);
-        timer.stop();
-        settledAtMillis = 0L;
-        blinkStartedAtMillis = 0L;
+        stopAllTimers();
+        pose = CatPose.SITTING;
+        animationFrame = 0;
         return;
       }
       setVisible(true);
@@ -254,10 +258,7 @@ public final class ActiveTabCatDecorator {
         currentX = targetX;
         currentY = targetY;
         initialized = true;
-        pose = CatPose.SITTING;
-        settledAtMillis = System.currentTimeMillis();
-        blinkStartedAtMillis = 0L;
-        ensureTimerRunning();
+        settleAtTarget();
         repaintCatArea();
         return;
       }
@@ -265,16 +266,15 @@ public final class ActiveTabCatDecorator {
         if (targetChanged) {
           settleAtTarget();
         }
-        ensureTimerRunning();
+        else if (pose == CatPose.SITTING && !blinkStartTimer.isRunning() && !blinkFinishTimer.isRunning()) {
+          scheduleBlink();
+        }
         repaintCatArea();
         return;
       }
-      if (targetChanged || pose == CatPose.IDLE) {
-        settledAtMillis = 0L;
-        blinkStartedAtMillis = 0L;
-      }
+      stopBlinkTimers();
       pose = nextMovingPose();
-      ensureTimerRunning();
+      ensureAnimationTimerRunning();
     }
 
     private void animate() {
@@ -283,8 +283,9 @@ public final class ActiveTabCatDecorator {
       double dy = targetY - currentY;
       double distance = Math.hypot(dx, dy);
       if (distance <= 0.5d) {
-        updateSettledPose();
-        animationFrame++;
+        currentX = targetX;
+        currentY = targetY;
+        settleAtTarget();
         repaint(oldArea.union(catArea()));
         return;
       }
@@ -299,47 +300,62 @@ public final class ActiveTabCatDecorator {
         currentY += dy / distance * speed;
         direction = dx >= 0 ? 1 : -1;
         pose = nextMovingPose(distance);
-        settledAtMillis = 0L;
         animationFrame++;
       }
       repaint(oldArea.union(catArea()));
     }
 
     private void settleAtTarget() {
+      animationTimer.stop();
+      stopBlinkTimers();
       pose = CatPose.SITTING;
-      settledAtMillis = System.currentTimeMillis();
-      blinkStartedAtMillis = 0L;
+      animationFrame = 0;
+      scheduleBlink();
     }
 
-    private void updateSettledPose() {
-      long nowMillis = System.currentTimeMillis();
-      if (settledAtMillis <= 0L) {
-        settledAtMillis = nowMillis;
-      }
-      if (pose == CatPose.IDLE) {
-        if (blinkStartedAtMillis > 0L && nowMillis - blinkStartedAtMillis < BLINK_DURATION_MILLIS) {
-          return;
-        }
-        pose = CatPose.SITTING;
-        settledAtMillis = nowMillis;
-        blinkStartedAtMillis = 0L;
+    private void scheduleBlink() {
+      if (!initialized || !isVisible() || !isAtTarget() || !currentSprites().hasIdle()) {
         return;
       }
-      long settledMillis = nowMillis - settledAtMillis;
-      CatSprites sprites = currentSprites();
-      if (settledMillis >= BLINK_AFTER_MILLIS && sprites.hasIdle()) {
-        pose = CatPose.IDLE;
-        blinkStartedAtMillis = nowMillis;
-        animationFrame = 0;
-        return;
-      }
-      pose = CatPose.SITTING;
+      blinkStartTimer.restart();
     }
 
-    private void ensureTimerRunning() {
-      if (!timer.isRunning()) {
-        timer.start();
+    private void startBlink() {
+      if (!initialized || !isVisible() || !isAtTarget() || !currentSprites().hasIdle()) {
+        return;
       }
+      Rectangle oldArea = catArea();
+      pose = CatPose.IDLE;
+      animationFrame = 0;
+      repaint(oldArea.union(catArea()));
+      blinkFinishTimer.restart();
+    }
+
+    private void finishBlink() {
+      if (pose != CatPose.IDLE) {
+        return;
+      }
+      Rectangle oldArea = catArea();
+      pose = CatPose.SITTING;
+      animationFrame = 0;
+      repaint(oldArea.union(catArea()));
+      scheduleBlink();
+    }
+
+    private void ensureAnimationTimerRunning() {
+      if (!animationTimer.isRunning()) {
+        animationTimer.start();
+      }
+    }
+
+    private void stopAllTimers() {
+      animationTimer.stop();
+      stopBlinkTimers();
+    }
+
+    private void stopBlinkTimers() {
+      blinkStartTimer.stop();
+      blinkFinishTimer.stop();
     }
 
     private boolean isAtTarget() {
@@ -385,7 +401,7 @@ public final class ActiveTabCatDecorator {
     }
 
     private void dispose() {
-      timer.stop();
+      stopAllTimers();
       if (layeredPane != null) {
         layeredPane.remove(this);
         layeredPane.repaint();
