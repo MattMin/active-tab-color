@@ -27,7 +27,7 @@ The plugin has been verified with IntelliJ IDEA Community `2024.1.7` and Intelli
 - Enable, disable, delete, move up, or move down rules.
 - Configure background, underline border, and outline border colors independently for each rule.
 - Show or hide an optional animated tab cat companion.
-- Choose the tab cat sprite set: Timi, Luna, or Siri.
+- Choose from multiple tab cat sprite sets.
 - The plugin does not change tab appearance by default. Colors are applied only after you manually enable a color item and choose a color.
 
 ## Settings
@@ -42,7 +42,7 @@ Settings > Tools > Active Tab Color
 
 The `Show tab cat` option enables an animated cat on the editor tab bar.
 
-- `Tab cat`: choose between `Timi`, `Luna`, and `Siri`.
+- `Tab cat`: choose one of the available cat sprite sets.
 - The preview next to the selector shows the selected cat.
 - The cat walks to nearby active tabs and runs to farther active tabs.
 - After reaching the active tab, the cat sits and blinks occasionally.

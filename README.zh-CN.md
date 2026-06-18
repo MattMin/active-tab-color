@@ -27,7 +27,7 @@ Active Tab Color 是一个 IntelliJ-based 插件，用于自定义编辑器 tab 
 - 规则支持启用/停用、删除、上移、下移。
 - 每条规则可以单独配置背景色、下划线边框色、外框色。
 - 可显示或隐藏一个动画 tab 小猫。
-- 小猫素材支持选择 Timi、Luna 或 Siri。
+- 小猫素材支持从多个小猫中选择。
 - 插件首次启用时不会修改任何 tab 样式，只有手动勾选并选择颜色后才会生效。
 
 ## 设置入口
@@ -44,7 +44,7 @@ Settings > Tools > Active Tab Color
 
 勾选 `Show tab cat` 后，会在编辑器 tab 栏上显示一只动画小猫。
 
-- `Tab cat`：选择 `Timi`、`Luna` 或 `Siri`。
+- `Tab cat`：选择一个可用的小猫素材。
 - 选择框旁边会展示当前小猫预览。
 - 小猫会走向较近的 active tab，距离较远时会跑过去。
 - 到达 active tab 后，小猫会坐下，并偶尔短暂眨眼。

@@ -33,16 +33,24 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.BorderLayout;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Image;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.net.URL;
 import java.util.Hashtable;
 import java.util.Objects;
 import java.util.regex.PatternSyntaxException;
 
 public final class ActiveTabColorConfigurable implements Configurable {
+  private static final int TAB_CAT_SIZE_SLIDER_PREFERRED_WIDTH = 180;
+  private static final int RULES_HELP_TEXT_COLUMNS = 22;
+  private static final int RULE_TEXT_FIELD_COLUMNS = 20;
+  private static final int RULE_LIST_PREFERRED_WIDTH = 160;
+
   private JPanel rootPanel;
   private JCheckBox enabledCheckBox;
   private JCheckBox showTabCatCheckBox;
@@ -71,11 +79,13 @@ public final class ActiveTabColorConfigurable implements Configurable {
   @Override
   public @Nullable JComponent createComponent() {
     rootPanel = new JPanel(new BorderLayout());
+    rootPanel.setMinimumSize(new Dimension(0, 0));
     rootPanel.setBorder(JBUI.Borders.empty(8));
 
     rootPanel.add(createTopPanel(), BorderLayout.NORTH);
 
     JPanel content = new JPanel(new BorderLayout(JBUI.scale(12), 0));
+    content.setMinimumSize(new Dimension(0, 0));
     content.add(createActivePanel(), BorderLayout.NORTH);
     content.add(createRulesPanel(), BorderLayout.CENTER);
     rootPanel.add(content, BorderLayout.CENTER);
@@ -138,6 +148,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
 
   private JComponent createActivePanel() {
     JPanel panel = new JPanel(new GridBagLayout());
+    panel.setMinimumSize(new Dimension(0, 0));
     panel.setBorder(BorderFactory.createTitledBorder("Active tab"));
     activeBackground = new ColorRow("Background");
     activeUnderline = new ColorRow("Underline border");
@@ -152,15 +163,16 @@ public final class ActiveTabColorConfigurable implements Configurable {
 
   private JComponent createTopPanel() {
     JPanel panel = new JPanel(new GridBagLayout());
+    panel.setMinimumSize(new Dimension(0, 0));
     enabledCheckBox = new JBCheckBox("Enable tab color customization");
     showTabCatCheckBox = new JBCheckBox("Show tab cat");
     tabCatComboBox = new JComboBox<>(CatOption.ALL);
     tabCatComboBox.setPreferredSize(JBUI.size(120, tabCatComboBox.getPreferredSize().height));
-    tabCatComboBox.setMinimumSize(JBUI.size(90, tabCatComboBox.getMinimumSize().height));
+    tabCatComboBox.setMinimumSize(new Dimension(0, tabCatComboBox.getMinimumSize().height));
     tabCatPreviewLabel = new JLabel();
     tabCatPreviewLabel.setHorizontalAlignment(JLabel.CENTER);
     tabCatPreviewLabel.setPreferredSize(JBUI.size(88, 64));
-    tabCatPreviewLabel.setMinimumSize(JBUI.size(88, 64));
+    tabCatPreviewLabel.setMinimumSize(JBUI.size(0, 64));
     tabCatSizeSlider = new JSlider(
       ActiveTabColorSettingsState.MIN_TAB_CAT_SCALE_PERCENT,
       ActiveTabColorSettingsState.MAX_TAB_CAT_SCALE_PERCENT,
@@ -168,9 +180,11 @@ public final class ActiveTabColorConfigurable implements Configurable {
     );
     tabCatSizeSlider.setMajorTickSpacing(10);
     tabCatSizeSlider.setPaintTicks(true);
-    tabCatSizeSlider.setPaintLabels(true);
-    tabCatSizeSlider.setLabelTable(createTabCatSizeLabels());
-    tabCatSizeValueLabel = new JLabel();
+    // tabCatSizeSlider.setPaintLabels(true);
+    // tabCatSizeSlider.setLabelTable(createTabCatSizeLabels());
+    tabCatSizeSlider.setPreferredSize(JBUI.size(TAB_CAT_SIZE_SLIDER_PREFERRED_WIDTH, tabCatSizeSlider.getPreferredSize().height));
+    tabCatSizeSlider.setMinimumSize(JBUI.size(0, tabCatSizeSlider.getMinimumSize().height));
+    tabCatSizeValueLabel = new JLabel(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT + "%");
     tabCatSizeValueLabel.setPreferredSize(JBUI.size(42, tabCatSizeValueLabel.getPreferredSize().height));
     showTabCatCheckBox.addActionListener(e -> updateTabCatControls());
     tabCatComboBox.addActionListener(e -> updateTabCatPreview());
@@ -180,9 +194,8 @@ public final class ActiveTabColorConfigurable implements Configurable {
     c.gridx = 0;
     c.gridy = 0;
     c.gridwidth = 3;
-    c.fill = GridBagConstraints.HORIZONTAL;
-    c.weightx = 1;
     panel.add(showTabCatCheckBox, c);
+    addHorizontalFiller(panel, 3, 0);
 
     c = baseConstraints();
     c.gridx = 0;
@@ -198,6 +211,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     c.gridx = 2;
     c.gridy = 1;
     panel.add(tabCatPreviewLabel, c);
+    addHorizontalFiller(panel, 3, 1);
 
     c = baseConstraints();
     c.gridx = 0;
@@ -207,39 +221,49 @@ public final class ActiveTabColorConfigurable implements Configurable {
     c = baseConstraints();
     c.gridx = 1;
     c.gridy = 2;
-    c.fill = GridBagConstraints.HORIZONTAL;
-    c.weightx = 1;
+    c.fill = GridBagConstraints.NONE;
     panel.add(createTabCatSizePanel(), c);
 
     c = baseConstraints();
     c.gridx = 2;
     c.gridy = 2;
     panel.add(tabCatSizeValueLabel, c);
+    addHorizontalFiller(panel, 3, 2);
 
     c = baseConstraints();
     c.gridx = 0;
     c.gridy = 3;
     c.gridwidth = 3;
-    c.fill = GridBagConstraints.HORIZONTAL;
-    c.weightx = 1;
     panel.add(enabledCheckBox, c);
+    addHorizontalFiller(panel, 3, 3);
     return panel;
   }
 
   private JPanel createTabCatSizePanel() {
     JPanel panel = new JPanel(new GridBagLayout());
+    panel.setMinimumSize(new Dimension(0, 0));
 
     GridBagConstraints c = baseConstraints();
     c.gridx = 0;
-    c.weightx = 1;
-    c.fill = GridBagConstraints.HORIZONTAL;
+    c.fill = GridBagConstraints.NONE;
     panel.add(tabCatSizeSlider, c);
     return panel;
   }
 
   private Hashtable<Integer, JLabel> createTabCatSizeLabels() {
     Hashtable<Integer, JLabel> labels = new Hashtable<>();
-    labels.put(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT, new JLabel("Default"));
+    JLabel defaultLabel = new JLabel("Default");
+    defaultLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    defaultLabel.setToolTipText("Restore default size");
+    defaultLabel.addMouseListener(new MouseAdapter() {
+      @Override
+      public void mouseClicked(MouseEvent e) {
+        if (tabCatSizeSlider.isEnabled()) {
+          setTabCatScalePercent(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT);
+        }
+      }
+    });
+    labels.put(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT, defaultLabel);
     return labels;
   }
 
@@ -285,6 +309,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
 
   private JComponent createRulesPanel() {
     JPanel panel = new JPanel(new BorderLayout(JBUI.scale(8), 0));
+    panel.setMinimumSize(new Dimension(0, 0));
     panel.setBorder(BorderFactory.createTitledBorder("Rules"));
 
     rulesModel = new DefaultListModel<>();
@@ -297,7 +322,12 @@ public final class ActiveTabColorConfigurable implements Configurable {
     });
 
     JPanel listPanel = new JPanel(new BorderLayout(0, JBUI.scale(6)));
-    listPanel.add(new JBScrollPane(rulesList), BorderLayout.CENTER);
+    listPanel.setMinimumSize(new Dimension(0, 0));
+    JBScrollPane rulesScrollPane = new JBScrollPane(rulesList);
+    Dimension rulesScrollPreferredSize = rulesScrollPane.getPreferredSize();
+    rulesScrollPane.setPreferredSize(JBUI.size(RULE_LIST_PREFERRED_WIDTH, rulesScrollPreferredSize.height));
+    rulesScrollPane.setMinimumSize(JBUI.size(0, rulesScrollPane.getMinimumSize().height));
+    listPanel.add(rulesScrollPane, BorderLayout.CENTER);
     listPanel.add(createRuleButtons(), BorderLayout.SOUTH);
     panel.add(listPanel, BorderLayout.WEST);
     panel.add(createRuleEditor(), BorderLayout.CENTER);
@@ -316,20 +346,29 @@ public final class ActiveTabColorConfigurable implements Configurable {
     up.addActionListener(e -> moveRule(-1));
     down.addActionListener(e -> moveRule(1));
 
-    panel.add(add);
-    panel.add(remove);
-    panel.add(up);
-    panel.add(down);
+    GridBagConstraints c = new GridBagConstraints();
+    c.insets = JBUI.insets(1);
+    c.gridx = 0;
+    c.gridy = 0;
+    panel.add(add, c);
+    c.gridx = 1;
+    panel.add(remove, c);
+    c.gridx = 0;
+    c.gridy = 1;
+    panel.add(up, c);
+    c.gridx = 1;
+    panel.add(down, c);
     return panel;
   }
 
   private JComponent createRuleEditor() {
     JPanel panel = new JPanel(new GridBagLayout());
+    panel.setMinimumSize(new Dimension(0, 0));
     panel.setBorder(JBUI.Borders.emptyLeft(8));
 
     ruleEnabled = new JBCheckBox("Enabled");
-    ruleName = new JBTextField();
-    rulePattern = new JBTextField();
+    ruleName = new JBTextField(RULE_TEXT_FIELD_COLUMNS);
+    rulePattern = new JBTextField(RULE_TEXT_FIELD_COLUMNS);
     ruleBackground = new ColorRow("Background");
     ruleUnderline = new ColorRow("Underline border");
     ruleOutline = new ColorRow("Outline border");
@@ -370,9 +409,11 @@ public final class ActiveTabColorConfigurable implements Configurable {
     text.setOpaque(false);
     text.setLineWrap(true);
     text.setWrapStyleWord(true);
-    text.setRows(2);
-    text.setColumns(42);
+    text.setRows(3);
+    text.setColumns(RULES_HELP_TEXT_COLUMNS);
+    text.setMinimumSize(new Dimension(0, 0));
     text.setBorder(JBUI.Borders.emptyBottom(2));
+    freezePreferredSize(text);
     return text;
   }
 
@@ -474,6 +515,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     fieldConstraints.gridy = row;
     fieldConstraints.weightx = 1;
     fieldConstraints.fill = GridBagConstraints.HORIZONTAL;
+    field.setMinimumSize(new Dimension(0, field.getMinimumSize().height));
     panel.add(field, fieldConstraints);
   }
 
@@ -495,7 +537,28 @@ public final class ActiveTabColorConfigurable implements Configurable {
     constraints.weightx = 1;
     constraints.weighty = 1;
     constraints.fill = GridBagConstraints.BOTH;
-    panel.add(new JPanel(), constraints);
+    panel.add(createZeroSizePanel(), constraints);
+  }
+
+  private void addHorizontalFiller(JPanel panel, int column, int row) {
+    GridBagConstraints constraints = new GridBagConstraints();
+    constraints.gridx = column;
+    constraints.gridy = row;
+    constraints.weightx = 1;
+    constraints.fill = GridBagConstraints.HORIZONTAL;
+    panel.add(createZeroSizePanel(), constraints);
+  }
+
+  private static void freezePreferredSize(JComponent component) {
+    Dimension preferredSize = component.getPreferredSize();
+    component.setPreferredSize(new Dimension(preferredSize.width, preferredSize.height));
+  }
+
+  private static JPanel createZeroSizePanel() {
+    JPanel panel = new JPanel();
+    panel.setMinimumSize(new Dimension(0, 0));
+    panel.setPreferredSize(new Dimension(0, 0));
+    return panel;
   }
 
   private GridBagConstraints baseConstraints() {
@@ -666,7 +729,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
       c.gridx = 4;
       c.weightx = 1;
       c.fill = GridBagConstraints.HORIZONTAL;
-      panel.add(new JPanel(), c);
+      panel.add(createZeroSizePanel(), c);
       updateEnabled();
     }
 

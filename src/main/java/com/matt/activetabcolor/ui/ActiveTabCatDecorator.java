@@ -29,6 +29,7 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.HierarchyBoundsAdapter;
 import java.awt.event.HierarchyEvent;
+import java.awt.event.HierarchyListener;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -48,6 +49,7 @@ public final class ActiveTabCatDecorator {
   private static final double RUN_SPEED = 4.2d;
   private static final int RUN_DISTANCE = 120;
   private static final int WALK_FINISH_DISTANCE = 80;
+  private static final int TURN_DURATION_FRAMES = 5;
   private static final int BLINK_AFTER_MILLIS = 5_000;
   private static final int BLINK_DURATION_MILLIS = 500;
   private static final Map<String, CatSprites> CAT_SPRITES = new ConcurrentHashMap<>();
@@ -116,7 +118,7 @@ public final class ActiveTabCatDecorator {
 
   private static CatOverlay getOrCreateOverlay(JComponent tabsComponent) {
     Object saved = tabsComponent.getClientProperty(CAT_OVERLAY_KEY);
-    if (saved instanceof CatOverlay overlay) {
+    if (saved instanceof CatOverlay overlay && !overlay.isDisposed()) {
       return overlay;
     }
     CatOverlay overlay = new CatOverlay(tabsComponent);
@@ -128,7 +130,6 @@ public final class ActiveTabCatDecorator {
     Object saved = tabsComponent.getClientProperty(CAT_OVERLAY_KEY);
     if (saved instanceof CatOverlay overlay) {
       overlay.dispose();
-      tabsComponent.putClientProperty(CAT_OVERLAY_KEY, null);
     }
   }
 
@@ -139,6 +140,7 @@ public final class ActiveTabCatDecorator {
     private final Timer blinkFinishTimer;
     private final ComponentAdapter componentListener;
     private final HierarchyBoundsAdapter hierarchyBoundsListener;
+    private final HierarchyListener hierarchyListener;
     private JLayeredPane layeredPane;
     private JBTabs lastTabs;
     private double currentX;
@@ -146,9 +148,11 @@ public final class ActiveTabCatDecorator {
     private int targetX;
     private int targetY;
     private int direction = 1;
+    private int turnTargetDirection = 1;
     private int animationFrame;
     private boolean initialized;
     private boolean refreshScheduled;
+    private boolean disposed;
     private CatPose pose = CatPose.SITTING;
 
     private CatOverlay(JComponent tabsComponent) {
@@ -175,6 +179,11 @@ public final class ActiveTabCatDecorator {
         public void componentShown(ComponentEvent e) {
           scheduleTargetRefresh();
         }
+
+        @Override
+        public void componentHidden(ComponentEvent e) {
+          dispose();
+        }
       };
       hierarchyBoundsListener = new HierarchyBoundsAdapter() {
         @Override
@@ -187,13 +196,26 @@ public final class ActiveTabCatDecorator {
           scheduleTargetRefresh();
         }
       };
+      hierarchyListener = e -> {
+        if ((e.getChangeFlags() & (HierarchyEvent.SHOWING_CHANGED | HierarchyEvent.DISPLAYABILITY_CHANGED)) == 0) {
+          return;
+        }
+        if (!tabsComponent.isShowing() || !tabsComponent.isDisplayable()) {
+          dispose();
+        }
+      };
       tabsComponent.addComponentListener(componentListener);
       tabsComponent.addHierarchyBoundsListener(hierarchyBoundsListener);
+      tabsComponent.addHierarchyListener(hierarchyListener);
     }
 
     private void refresh(JBTabs tabs) {
+      if (disposed) {
+        return;
+      }
       lastTabs = tabs;
       if (!tabsComponent.isShowing()) {
+        dispose();
         return;
       }
       JLayeredPane pane = findLayeredPane(tabsComponent);
@@ -248,9 +270,6 @@ public final class ActiveTabCatDecorator {
     }
 
     private void moveTo(int x, int y) {
-      if (initialized && x != Math.round(currentX)) {
-        direction = x > currentX ? 1 : -1;
-      }
       boolean targetChanged = targetX != x || targetY != y;
       targetX = x;
       targetY = y;
@@ -273,12 +292,19 @@ public final class ActiveTabCatDecorator {
         return;
       }
       stopBlinkTimers();
-      pose = nextMovingPose();
+      if (pose != CatPose.TURNING) {
+        pose = nextMovingPose();
+      }
       ensureAnimationTimerRunning();
     }
 
     private void animate() {
       Rectangle oldArea = catArea();
+      if (pose == CatPose.TURNING) {
+        advanceTurn();
+        repaint(oldArea.union(catArea()));
+        return;
+      }
       double dx = targetX - currentX;
       double dy = targetY - currentY;
       double distance = Math.hypot(dx, dy);
@@ -289,6 +315,15 @@ public final class ActiveTabCatDecorator {
         repaint(oldArea.union(catArea()));
         return;
       }
+      int desiredDirection = directionForDelta(dx);
+      if (shouldTurn(desiredDirection)) {
+        startTurn(desiredDirection);
+        repaint(oldArea.union(catArea()));
+        return;
+      }
+      if (desiredDirection != 0) {
+        direction = desiredDirection;
+      }
       double speed = moveSpeed(distance);
       if (distance <= speed) {
         currentX = targetX;
@@ -298,11 +333,58 @@ public final class ActiveTabCatDecorator {
       else {
         currentX += dx / distance * speed;
         currentY += dy / distance * speed;
-        direction = dx >= 0 ? 1 : -1;
         pose = nextMovingPose(distance);
         animationFrame++;
       }
       repaint(oldArea.union(catArea()));
+    }
+
+    private boolean shouldTurn(int desiredDirection) {
+      return desiredDirection != 0 &&
+             desiredDirection != direction &&
+             currentSprites().hasTurning();
+    }
+
+    private void startTurn(int desiredDirection) {
+      pose = CatPose.TURNING;
+      turnTargetDirection = desiredDirection;
+      animationFrame = 0;
+      stopBlinkTimers();
+      ensureAnimationTimerRunning();
+    }
+
+    private void advanceTurn() {
+      int desiredDirection = directionForDelta(targetX - currentX);
+      if (desiredDirection == direction) {
+        animationFrame = 0;
+        pose = isAtTarget() ? CatPose.SITTING : nextMovingPose();
+        if (pose == CatPose.SITTING) {
+          settleAtTarget();
+        }
+        return;
+      }
+      if (desiredDirection != 0 && desiredDirection != turnTargetDirection) {
+        turnTargetDirection = desiredDirection;
+        animationFrame = 0;
+        return;
+      }
+      animationFrame++;
+      if (animationFrame < TURN_DURATION_FRAMES) {
+        return;
+      }
+      direction = turnTargetDirection;
+      animationFrame = 0;
+      pose = isAtTarget() ? CatPose.SITTING : nextMovingPose();
+      if (pose == CatPose.SITTING) {
+        settleAtTarget();
+      }
+    }
+
+    private int directionForDelta(double dx) {
+      if (Math.abs(dx) < 0.5d) {
+        return 0;
+      }
+      return dx > 0 ? 1 : -1;
     }
 
     private void settleAtTarget() {
@@ -401,6 +483,10 @@ public final class ActiveTabCatDecorator {
     }
 
     private void dispose() {
+      if (disposed) {
+        return;
+      }
+      disposed = true;
       stopAllTimers();
       if (layeredPane != null) {
         layeredPane.remove(this);
@@ -409,11 +495,19 @@ public final class ActiveTabCatDecorator {
       }
       tabsComponent.removeComponentListener(componentListener);
       tabsComponent.removeHierarchyBoundsListener(hierarchyBoundsListener);
+      tabsComponent.removeHierarchyListener(hierarchyListener);
+      if (tabsComponent.getClientProperty(CAT_OVERLAY_KEY) == this) {
+        tabsComponent.putClientProperty(CAT_OVERLAY_KEY, null);
+      }
       lastTabs = null;
     }
 
+    private boolean isDisposed() {
+      return disposed;
+    }
+
     private void scheduleTargetRefresh() {
-      if (refreshScheduled || lastTabs == null) {
+      if (disposed || refreshScheduled || lastTabs == null) {
         return;
       }
       refreshScheduled = true;
@@ -455,12 +549,19 @@ public final class ActiveTabCatDecorator {
 
       g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
       g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-      if (direction < 0) {
+      if (shouldMirrorCurrentSprite()) {
         g2.translate(width, 0);
         g2.scale(-1, 1);
       }
 
       paintSprite(g2, sprite, width, height);
+    }
+
+    private boolean shouldMirrorCurrentSprite() {
+      if (pose == CatPose.TURNING) {
+        return turnTargetDirection > 0;
+      }
+      return direction < 0;
     }
 
     private int catWidth() {
@@ -486,6 +587,7 @@ public final class ActiveTabCatDecorator {
   private enum CatPose {
     WALKING,
     RUNNING,
+    TURNING,
     SITTING,
     IDLE
   }
@@ -493,6 +595,7 @@ public final class ActiveTabCatDecorator {
   private record CatSprites(List<BufferedImage> walking,
                             List<BufferedImage> running,
                             List<BufferedImage> idle,
+                            BufferedImage turning,
                             BufferedImage sitting) {
     private static CatSprites load(String catId) {
       String normalizedCatId = ActiveTabColorSettingsState.normalizeTabCat(catId);
@@ -500,11 +603,15 @@ public final class ActiveTabCatDecorator {
         loadFrames(normalizedCatId, "walk", 4),
         loadFrames(normalizedCatId, "run", 6),
         loadFrames(normalizedCatId, "idle", 2),
+        loadImage(normalizedCatId, "turn.png"),
         loadImage(normalizedCatId, "sit.png")
       );
     }
 
     private BufferedImage spriteFor(CatPose pose, int animationFrame) {
+      if (pose == CatPose.TURNING && turning != null) {
+        return turning;
+      }
       if (pose == CatPose.IDLE && !idle.isEmpty()) {
         return idle.get(0);
       }
@@ -522,6 +629,10 @@ public final class ActiveTabCatDecorator {
 
     private boolean hasIdle() {
       return !idle.isEmpty();
+    }
+
+    private boolean hasTurning() {
+      return turning != null;
     }
 
     private static int frameIndex(int animationFrame, int size, int framesPerSprite) {
