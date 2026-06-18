@@ -5,6 +5,7 @@
 
     <description><![CDATA[
         Customize editor tab colors with active tab settings and regex-based tab name rules.
+        Add an optional animated Tab Cat companion that follows the active editor tab.
         Repository: <a href="https://github.com/MattMin/active-tab-color">https://github.com/MattMin/active-tab-color</a>
     ]]></description>
 
