@@ -17,6 +17,11 @@ import java.util.Objects;
 @State(name = "ActiveTabColorSettings", storages = @Storage("activeTabColor.xml"))
 public final class ActiveTabColorSettingsState implements PersistentStateComponent<ActiveTabColorSettingsState.PluginState> {
   public static final String DEFAULT_TAB_CAT = "timi";
+  public static final int MIN_TAB_CAT_SCALE_PERCENT = 60;
+  public static final int SMALL_TAB_CAT_SCALE_PERCENT = 80;
+  public static final int DEFAULT_TAB_CAT_SCALE_PERCENT = 100;
+  public static final int LARGE_TAB_CAT_SCALE_PERCENT = 125;
+  public static final int MAX_TAB_CAT_SCALE_PERCENT = 150;
   private PluginState state = new PluginState();
 
   public static ActiveTabColorSettingsState getInstance() {
@@ -41,6 +46,7 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
     public boolean enabled = true;
     public boolean showTabCat;
     public String tabCat = DEFAULT_TAB_CAT;
+    public int tabCatScalePercent = DEFAULT_TAB_CAT_SCALE_PERCENT;
     public ColorSettings active = new ColorSettings();
     public List<TabColorRule> rules = new ArrayList<>();
 
@@ -49,6 +55,7 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
       copy.enabled = enabled;
       copy.showTabCat = showTabCat;
       copy.tabCat = normalizeTabCat(tabCat);
+      copy.tabCatScalePercent = normalizeTabCatScalePercent(tabCatScalePercent);
       copy.active = active == null ? new ColorSettings() : active.copy();
       copy.rules = new ArrayList<>();
       if (rules != null) {
@@ -69,6 +76,7 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
       }
       return enabled == that.enabled &&
              showTabCat == that.showTabCat &&
+             normalizeTabCatScalePercent(tabCatScalePercent) == normalizeTabCatScalePercent(that.tabCatScalePercent) &&
              Objects.equals(normalizeTabCat(tabCat), normalizeTabCat(that.tabCat)) &&
              Objects.equals(active, that.active) &&
              Objects.equals(rules, that.rules);
@@ -76,7 +84,7 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
 
     @Override
     public int hashCode() {
-      return Objects.hash(enabled, showTabCat, normalizeTabCat(tabCat), active, rules);
+      return Objects.hash(enabled, showTabCat, normalizeTabCat(tabCat), normalizeTabCatScalePercent(tabCatScalePercent), active, rules);
     }
   }
 
@@ -169,5 +177,9 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
       return "luna";
     }
     return DEFAULT_TAB_CAT;
+  }
+
+  public static int normalizeTabCatScalePercent(int percent) {
+    return Math.max(MIN_TAB_CAT_SCALE_PERCENT, Math.min(MAX_TAB_CAT_SCALE_PERCENT, percent));
   }
 }

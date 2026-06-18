@@ -42,6 +42,8 @@ public final class ActiveTabCatDecorator {
   private static final Logger LOG = Logger.getInstance(ActiveTabCatDecorator.class);
   private static final String CAT_OVERLAY_KEY = "activeTabColor.catOverlay";
   private static final int TIMER_DELAY_MILLIS = 30;
+  private static final int BASE_CAT_WIDTH = 44;
+  private static final int BASE_CAT_HEIGHT = 31;
   private static final double WALK_SPEED = 2.0d;
   private static final double RUN_SPEED = 4.2d;
   private static final int RUN_DISTANCE = 120;
@@ -446,11 +448,11 @@ public final class ActiveTabCatDecorator {
     }
 
     private int catWidth() {
-      return JBUI.scale(44);
+      return JBUI.scale(scaleDimension(BASE_CAT_WIDTH, currentScalePercent()));
     }
 
     private int catHeight() {
-      return JBUI.scale(31);
+      return JBUI.scale(scaleDimension(BASE_CAT_HEIGHT, currentScalePercent()));
     }
 
     private void paintSprite(Graphics2D g2, BufferedImage sprite, int width, int height) {
@@ -544,6 +546,13 @@ public final class ActiveTabCatDecorator {
     return CAT_SPRITES.computeIfAbsent(normalized, CatSprites::load);
   }
 
+  private static int currentScalePercent() {
+    ActiveTabColorSettingsState.PluginState state = ActiveTabColorSettingsState.getInstance().getState();
+    return state == null
+           ? ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT
+           : ActiveTabColorSettingsState.normalizeTabCatScalePercent(state.tabCatScalePercent);
+  }
+
   private static JLayeredPane findLayeredPane(Component component) {
     Window window = SwingUtilities.getWindowAncestor(component);
     if (window instanceof RootPaneContainer rootPaneContainer) {
@@ -554,5 +563,9 @@ public final class ActiveTabCatDecorator {
 
   private static int clamp(int value, int min, int max) {
     return Math.max(min, Math.min(max, value));
+  }
+
+  private static int scaleDimension(int value, int scalePercent) {
+    return Math.max(1, (int)Math.round(value * scalePercent / 100.0d));
   }
 }

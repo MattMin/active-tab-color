@@ -25,6 +25,7 @@ import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JSlider;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
@@ -37,6 +38,7 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Image;
 import java.net.URL;
+import java.util.Hashtable;
 import java.util.Objects;
 import java.util.regex.PatternSyntaxException;
 
@@ -46,6 +48,8 @@ public final class ActiveTabColorConfigurable implements Configurable {
   private JCheckBox showTabCatCheckBox;
   private JComboBox<CatOption> tabCatComboBox;
   private JLabel tabCatPreviewLabel;
+  private JSlider tabCatSizeSlider;
+  private JLabel tabCatSizeValueLabel;
   private ColorRow activeBackground;
   private ColorRow activeUnderline;
   private ColorRow activeOutline;
@@ -107,6 +111,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     enabledCheckBox.setSelected(state.enabled);
     showTabCatCheckBox.setSelected(state.showTabCat);
     selectTabCat(state.tabCat);
+    setTabCatScalePercent(state.tabCatScalePercent);
     updateTabCatControls();
     activeBackground.setRgb(state.active.backgroundRgb);
     activeUnderline.setRgb(state.active.underlineBorderRgb);
@@ -153,8 +158,23 @@ public final class ActiveTabColorConfigurable implements Configurable {
     tabCatComboBox.setPreferredSize(JBUI.size(120, tabCatComboBox.getPreferredSize().height));
     tabCatComboBox.setMinimumSize(JBUI.size(90, tabCatComboBox.getMinimumSize().height));
     tabCatPreviewLabel = new JLabel();
+    tabCatPreviewLabel.setHorizontalAlignment(JLabel.CENTER);
+    tabCatPreviewLabel.setPreferredSize(JBUI.size(88, 64));
+    tabCatPreviewLabel.setMinimumSize(JBUI.size(88, 64));
+    tabCatSizeSlider = new JSlider(
+      ActiveTabColorSettingsState.MIN_TAB_CAT_SCALE_PERCENT,
+      ActiveTabColorSettingsState.MAX_TAB_CAT_SCALE_PERCENT,
+      ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT
+    );
+    tabCatSizeSlider.setMajorTickSpacing(10);
+    tabCatSizeSlider.setPaintTicks(true);
+    tabCatSizeSlider.setPaintLabels(true);
+    tabCatSizeSlider.setLabelTable(createTabCatSizeLabels());
+    tabCatSizeValueLabel = new JLabel();
+    tabCatSizeValueLabel.setPreferredSize(JBUI.size(42, tabCatSizeValueLabel.getPreferredSize().height));
     showTabCatCheckBox.addActionListener(e -> updateTabCatControls());
     tabCatComboBox.addActionListener(e -> updateTabCatPreview());
+    tabCatSizeSlider.addChangeListener(e -> updateTabCatSizeUi());
 
     GridBagConstraints c = baseConstraints();
     c.gridx = 0;
@@ -182,11 +202,45 @@ public final class ActiveTabColorConfigurable implements Configurable {
     c = baseConstraints();
     c.gridx = 0;
     c.gridy = 2;
+    panel.add(new JLabel("Size"), c);
+
+    c = baseConstraints();
+    c.gridx = 1;
+    c.gridy = 2;
+    c.fill = GridBagConstraints.HORIZONTAL;
+    c.weightx = 1;
+    panel.add(createTabCatSizePanel(), c);
+
+    c = baseConstraints();
+    c.gridx = 2;
+    c.gridy = 2;
+    panel.add(tabCatSizeValueLabel, c);
+
+    c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 3;
     c.gridwidth = 3;
     c.fill = GridBagConstraints.HORIZONTAL;
     c.weightx = 1;
     panel.add(enabledCheckBox, c);
     return panel;
+  }
+
+  private JPanel createTabCatSizePanel() {
+    JPanel panel = new JPanel(new GridBagLayout());
+
+    GridBagConstraints c = baseConstraints();
+    c.gridx = 0;
+    c.weightx = 1;
+    c.fill = GridBagConstraints.HORIZONTAL;
+    panel.add(tabCatSizeSlider, c);
+    return panel;
+  }
+
+  private Hashtable<Integer, JLabel> createTabCatSizeLabels() {
+    Hashtable<Integer, JLabel> labels = new Hashtable<>();
+    labels.put(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT, new JLabel("Default"));
+    return labels;
   }
 
   private void selectTabCat(String tabCat) {
@@ -204,12 +258,29 @@ public final class ActiveTabColorConfigurable implements Configurable {
     boolean enabled = showTabCatCheckBox.isSelected();
     tabCatComboBox.setEnabled(enabled);
     tabCatPreviewLabel.setEnabled(enabled);
+    tabCatSizeSlider.setEnabled(enabled);
+    tabCatSizeValueLabel.setEnabled(enabled);
     updateTabCatPreview();
   }
 
   private void updateTabCatPreview() {
     CatOption option = (CatOption)tabCatComboBox.getSelectedItem();
-    tabCatPreviewLabel.setIcon(option == null ? null : option.previewIcon());
+    tabCatPreviewLabel.setIcon(option == null ? null : option.previewIcon(readTabCatScalePercent()));
+  }
+
+  private void setTabCatScalePercent(int scalePercent) {
+    tabCatSizeSlider.setValue(ActiveTabColorSettingsState.normalizeTabCatScalePercent(scalePercent));
+    updateTabCatSizeUi();
+  }
+
+  private int readTabCatScalePercent() {
+    return ActiveTabColorSettingsState.normalizeTabCatScalePercent(tabCatSizeSlider.getValue());
+  }
+
+  private void updateTabCatSizeUi() {
+    int scalePercent = readTabCatScalePercent();
+    tabCatSizeValueLabel.setText(scalePercent + "%");
+    updateTabCatPreview();
   }
 
   private JComponent createRulesPanel() {
@@ -381,6 +452,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     state.showTabCat = showTabCatCheckBox.isSelected();
     CatOption tabCat = (CatOption)tabCatComboBox.getSelectedItem();
     state.tabCat = tabCat == null ? ActiveTabColorSettingsState.DEFAULT_TAB_CAT : tabCat.id;
+    state.tabCatScalePercent = readTabCatScalePercent();
     state.active.backgroundRgb = activeBackground.getRgb();
     state.active.underlineBorderRgb = activeUnderline.getRgb();
     state.active.outlineBorderRgb = activeOutline.getRgb();
@@ -498,27 +570,37 @@ public final class ActiveTabColorConfigurable implements Configurable {
 
     private final String id;
     private final String displayName;
-    private ImageIcon previewIcon;
+    private ImageIcon[] previewIcons = new ImageIcon[ActiveTabColorSettingsState.MAX_TAB_CAT_SCALE_PERCENT + 1];
 
     private CatOption(String id, String displayName) {
       this.id = id;
       this.displayName = displayName;
     }
 
-    private ImageIcon previewIcon() {
-      if (previewIcon == null) {
+    private ImageIcon previewIcon(int scalePercent) {
+      int normalizedScalePercent = ActiveTabColorSettingsState.normalizeTabCatScalePercent(scalePercent);
+      if (previewIcons[normalizedScalePercent] == null) {
         URL resource = ActiveTabColorConfigurable.class.getResource("/icons/cat/" + id + "/sit.png");
         if (resource != null) {
           ImageIcon sourceIcon = new ImageIcon(resource);
-          Dimension previewSize = scaledSize(sourceIcon.getIconWidth(), sourceIcon.getIconHeight(), JBUI.scale(52), JBUI.scale(38));
+          Dimension previewSize = scaledSize(
+            sourceIcon.getIconWidth(),
+            sourceIcon.getIconHeight(),
+            scaleDimension(JBUI.scale(52), normalizedScalePercent),
+            scaleDimension(JBUI.scale(38), normalizedScalePercent)
+          );
           Image image = sourceIcon.getImage().getScaledInstance(previewSize.width, previewSize.height, Image.SCALE_SMOOTH);
-          previewIcon = new ImageIcon(image);
+          previewIcons[normalizedScalePercent] = new ImageIcon(image);
         }
         else {
-          previewIcon = new ImageIcon();
+          previewIcons[normalizedScalePercent] = new ImageIcon();
         }
       }
-      return previewIcon;
+      return previewIcons[normalizedScalePercent];
+    }
+
+    private static int scaleDimension(int value, int scalePercent) {
+      return Math.max(1, (int)Math.round(value * scalePercent / 100.0d));
     }
 
     private static Dimension scaledSize(int width, int height, int maxWidth, int maxHeight) {
