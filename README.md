@@ -9,6 +9,7 @@ Active Tab Color is an IntelliJ Platform-based plugin for customizing editor tab
 It also includes an optional Tab Cat companion that walks, runs, sits, and blinks on the editor tab bar.
 
 ![Settings](img/settings.png)
+![tab_cat](img/tab_cat.gif)
 
 ## Compatibility
 

@@ -9,6 +9,7 @@ Active Tab Color 是一个 IntelliJ-based 插件，用于自定义编辑器 tab 
 插件也提供可选的 Tab Cat 小猫伴侣，小猫会在编辑器 tab 栏上走动、奔跑、坐下和眨眼。
 
 ![Settings](img/settings.png)
+![tab_cat](img/tab_cat.gif)
 
 ## 兼容性
 
