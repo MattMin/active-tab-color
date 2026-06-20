@@ -6,7 +6,7 @@ plugins {
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 
 group = 'com.matt'
-version = '0.1.5'
+version = '1.0.0'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -41,8 +41,13 @@ patchPluginXml {
     sinceBuild = '241.19416.15'
     untilBuild = provider { null }
     changeNotes = """
+      <h3>1.0.0</h3>
       <ul>
-        <li>Initial version with active tab colors and regex-based tab color rules.</li>
+        <li>Add optional Tab Cat companion on the editor tab bar.</li>
+        <li>Add multiple selectable cat sprite sets with preview support.</li>
+        <li>Add configurable tab cat size.</li>
+        <li>Add walking, running, sitting, and blink animations that follow the active editor tab.</li>
+        <li>Add Settings option, Tools menu action, and default keyboard shortcut for showing or hiding the tab cat.</li>
       </ul>
     """
 }

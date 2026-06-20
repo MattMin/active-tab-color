@@ -5,6 +5,7 @@
 
     <description><![CDATA[
         Customize editor tab colors with active tab settings and regex-based tab name rules.
+        Add an optional animated Tab Cat companion that follows the active editor tab.
         Repository: <a href="https://github.com/MattMin/active-tab-color">https://github.com/MattMin/active-tab-color</a>
     ]]></description>
 
@@ -27,4 +28,14 @@
         <listener class="com.matt.activetabcolor.ui.ActiveTabColorFileEditorListener"
                   topic="com.intellij.openapi.fileEditor.FileEditorManagerListener"/>
     </projectListeners>
+
+    <actions>
+        <action id="com.matt.activetabcolor.ToggleTabCat"
+                class="com.matt.activetabcolor.ui.ToggleTabCatAction"
+                text="Show Tab Cat"
+                description="Show or hide the editor tab cat">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt shift C"/>
+        </action>
+    </actions>
 </idea-plugin>
