@@ -15,6 +15,7 @@ class ActiveTabColorSettingsStateTest {
     assertFalse(state.showTabCat);
     assertEquals("timi", state.tabCat);
     assertEquals(100, state.tabCatScalePercent);
+    assertEquals(100, state.tabCatSpeedPercent);
   }
 
   @Test
@@ -23,12 +24,14 @@ class ActiveTabColorSettingsStateTest {
     state.showTabCat = true;
     state.tabCat = "siri";
     state.tabCatScalePercent = 125;
+    state.tabCatSpeedPercent = 175;
 
     ActiveTabColorSettingsState.PluginState copy = state.copy();
 
     assertTrue(copy.showTabCat);
     assertEquals("siri", copy.tabCat);
     assertEquals(125, copy.tabCatScalePercent);
+    assertEquals(175, copy.tabCatSpeedPercent);
     assertEquals(state, copy);
   }
 
@@ -51,6 +54,15 @@ class ActiveTabColorSettingsStateTest {
   }
 
   @Test
+  void equalityIncludesTabCatSpeed() {
+    ActiveTabColorSettingsState.PluginState normal = new ActiveTabColorSettingsState.PluginState();
+    ActiveTabColorSettingsState.PluginState fast = new ActiveTabColorSettingsState.PluginState();
+    fast.tabCatSpeedPercent = 150;
+
+    assertNotEquals(normal, fast);
+  }
+
+  @Test
   void invalidTabCatFallsBackToDefault() {
     assertEquals("siri", ActiveTabColorSettingsState.normalizeTabCat("siri"));
     assertEquals("luna", ActiveTabColorSettingsState.normalizeTabCat("luna"));
@@ -67,5 +79,16 @@ class ActiveTabColorSettingsStateTest {
     ActiveTabColorSettingsState.PluginState tooSmall = new ActiveTabColorSettingsState.PluginState();
     tooSmall.tabCatScalePercent = 10;
     assertEquals(60, tooSmall.copy().tabCatScalePercent);
+  }
+
+  @Test
+  void invalidTabCatSpeedIsClamped() {
+    assertEquals(50, ActiveTabColorSettingsState.normalizeTabCatSpeedPercent(10));
+    assertEquals(100, ActiveTabColorSettingsState.normalizeTabCatSpeedPercent(100));
+    assertEquals(200, ActiveTabColorSettingsState.normalizeTabCatSpeedPercent(300));
+
+    ActiveTabColorSettingsState.PluginState tooFast = new ActiveTabColorSettingsState.PluginState();
+    tooFast.tabCatSpeedPercent = 300;
+    assertEquals(200, tooFast.copy().tabCatSpeedPercent);
   }
 }

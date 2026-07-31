@@ -46,7 +46,7 @@ import java.util.Objects;
 import java.util.regex.PatternSyntaxException;
 
 public final class ActiveTabColorConfigurable implements Configurable {
-  private static final int TAB_CAT_SIZE_SLIDER_PREFERRED_WIDTH = 180;
+  private static final int TAB_CAT_SLIDER_PREFERRED_WIDTH = 180;
   private static final int RULES_HELP_TEXT_COLUMNS = 22;
   private static final int RULE_TEXT_FIELD_COLUMNS = 20;
   private static final int RULE_LIST_PREFERRED_WIDTH = 160;
@@ -58,6 +58,8 @@ public final class ActiveTabColorConfigurable implements Configurable {
   private JLabel tabCatPreviewLabel;
   private JSlider tabCatSizeSlider;
   private JLabel tabCatSizeValueLabel;
+  private JSlider tabCatSpeedSlider;
+  private JLabel tabCatSpeedValueLabel;
   private ColorRow activeBackground;
   private ColorRow activeUnderline;
   private ColorRow activeOutline;
@@ -122,6 +124,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     showTabCatCheckBox.setSelected(state.showTabCat);
     selectTabCat(state.tabCat);
     setTabCatScalePercent(state.tabCatScalePercent);
+    setTabCatSpeedPercent(state.tabCatSpeedPercent);
     updateTabCatControls();
     activeBackground.setRgb(state.active.backgroundRgb);
     activeUnderline.setRgb(state.active.underlineBorderRgb);
@@ -182,13 +185,25 @@ public final class ActiveTabColorConfigurable implements Configurable {
     tabCatSizeSlider.setPaintTicks(true);
     // tabCatSizeSlider.setPaintLabels(true);
     // tabCatSizeSlider.setLabelTable(createTabCatSizeLabels());
-    tabCatSizeSlider.setPreferredSize(JBUI.size(TAB_CAT_SIZE_SLIDER_PREFERRED_WIDTH, tabCatSizeSlider.getPreferredSize().height));
+    tabCatSizeSlider.setPreferredSize(JBUI.size(TAB_CAT_SLIDER_PREFERRED_WIDTH, tabCatSizeSlider.getPreferredSize().height));
     tabCatSizeSlider.setMinimumSize(JBUI.size(0, tabCatSizeSlider.getMinimumSize().height));
     tabCatSizeValueLabel = new JLabel(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT + "%");
     tabCatSizeValueLabel.setPreferredSize(JBUI.size(42, tabCatSizeValueLabel.getPreferredSize().height));
+    tabCatSpeedSlider = new JSlider(
+      ActiveTabColorSettingsState.MIN_TAB_CAT_SPEED_PERCENT,
+      ActiveTabColorSettingsState.MAX_TAB_CAT_SPEED_PERCENT,
+      ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SPEED_PERCENT
+    );
+    tabCatSpeedSlider.setMajorTickSpacing(25);
+    tabCatSpeedSlider.setPaintTicks(true);
+    tabCatSpeedSlider.setPreferredSize(JBUI.size(TAB_CAT_SLIDER_PREFERRED_WIDTH, tabCatSpeedSlider.getPreferredSize().height));
+    tabCatSpeedSlider.setMinimumSize(JBUI.size(0, tabCatSpeedSlider.getMinimumSize().height));
+    tabCatSpeedValueLabel = new JLabel(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SPEED_PERCENT + "%");
+    tabCatSpeedValueLabel.setPreferredSize(JBUI.size(42, tabCatSpeedValueLabel.getPreferredSize().height));
     showTabCatCheckBox.addActionListener(e -> updateTabCatControls());
     tabCatComboBox.addActionListener(e -> updateTabCatPreview());
     tabCatSizeSlider.addChangeListener(e -> updateTabCatSizeUi());
+    tabCatSpeedSlider.addChangeListener(e -> updateTabCatSpeedUi());
 
     GridBagConstraints c = baseConstraints();
     c.gridx = 0;
@@ -233,9 +248,26 @@ public final class ActiveTabColorConfigurable implements Configurable {
     c = baseConstraints();
     c.gridx = 0;
     c.gridy = 3;
+    panel.add(new JLabel("Speed"), c);
+
+    c = baseConstraints();
+    c.gridx = 1;
+    c.gridy = 3;
+    c.fill = GridBagConstraints.NONE;
+    panel.add(tabCatSpeedSlider, c);
+
+    c = baseConstraints();
+    c.gridx = 2;
+    c.gridy = 3;
+    panel.add(tabCatSpeedValueLabel, c);
+    addHorizontalFiller(panel, 3, 3);
+
+    c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 4;
     c.gridwidth = 3;
     panel.add(enabledCheckBox, c);
-    addHorizontalFiller(panel, 3, 3);
+    addHorizontalFiller(panel, 3, 4);
     return panel;
   }
 
@@ -284,6 +316,8 @@ public final class ActiveTabColorConfigurable implements Configurable {
     tabCatPreviewLabel.setEnabled(enabled);
     tabCatSizeSlider.setEnabled(enabled);
     tabCatSizeValueLabel.setEnabled(enabled);
+    tabCatSpeedSlider.setEnabled(enabled);
+    tabCatSpeedValueLabel.setEnabled(enabled);
     updateTabCatPreview();
   }
 
@@ -305,6 +339,19 @@ public final class ActiveTabColorConfigurable implements Configurable {
     int scalePercent = readTabCatScalePercent();
     tabCatSizeValueLabel.setText(scalePercent + "%");
     updateTabCatPreview();
+  }
+
+  private void setTabCatSpeedPercent(int speedPercent) {
+    tabCatSpeedSlider.setValue(ActiveTabColorSettingsState.normalizeTabCatSpeedPercent(speedPercent));
+    updateTabCatSpeedUi();
+  }
+
+  private int readTabCatSpeedPercent() {
+    return ActiveTabColorSettingsState.normalizeTabCatSpeedPercent(tabCatSpeedSlider.getValue());
+  }
+
+  private void updateTabCatSpeedUi() {
+    tabCatSpeedValueLabel.setText(readTabCatSpeedPercent() + "%");
   }
 
   private JComponent createRulesPanel() {
@@ -494,6 +541,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     CatOption tabCat = (CatOption)tabCatComboBox.getSelectedItem();
     state.tabCat = tabCat == null ? ActiveTabColorSettingsState.DEFAULT_TAB_CAT : tabCat.id;
     state.tabCatScalePercent = readTabCatScalePercent();
+    state.tabCatSpeedPercent = readTabCatSpeedPercent();
     state.active.backgroundRgb = activeBackground.getRgb();
     state.active.underlineBorderRgb = activeUnderline.getRgb();
     state.active.outlineBorderRgb = activeOutline.getRgb();

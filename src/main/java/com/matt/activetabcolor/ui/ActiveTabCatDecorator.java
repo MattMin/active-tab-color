@@ -453,15 +453,18 @@ public final class ActiveTabCatDecorator {
     }
 
     private double moveSpeed(double distance) {
+      double speed;
       if (distance >= JBUI.scale(RUN_DISTANCE)) {
-        return Math.max(1.0d, JBUI.scale((int)RUN_SPEED));
+        speed = JBUI.scale((int)RUN_SPEED);
       }
-      if (distance <= JBUI.scale(WALK_FINISH_DISTANCE)) {
-        return Math.max(1.0d, JBUI.scale((int)WALK_SPEED));
+      else if (distance <= JBUI.scale(WALK_FINISH_DISTANCE)) {
+        speed = JBUI.scale((int)WALK_SPEED);
       }
-      double progress = (distance - JBUI.scale(WALK_FINISH_DISTANCE)) / (double)JBUI.scale(RUN_DISTANCE - WALK_FINISH_DISTANCE);
-      double speed = WALK_SPEED + (RUN_SPEED - WALK_SPEED) * progress;
-      return Math.max(1.0d, JBUI.scale((int)Math.round(speed)));
+      else {
+        double progress = (distance - JBUI.scale(WALK_FINISH_DISTANCE)) / (double)JBUI.scale(RUN_DISTANCE - WALK_FINISH_DISTANCE);
+        speed = JBUI.scale((int)Math.round(WALK_SPEED + (RUN_SPEED - WALK_SPEED) * progress));
+      }
+      return Math.max(1.0d, speed * currentSpeedPercent() / 100.0d);
     }
 
     private double distanceToTarget() {
@@ -678,6 +681,13 @@ public final class ActiveTabCatDecorator {
     return state == null
            ? ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT
            : ActiveTabColorSettingsState.normalizeTabCatScalePercent(state.tabCatScalePercent);
+  }
+
+  private static int currentSpeedPercent() {
+    ActiveTabColorSettingsState.PluginState state = ActiveTabColorSettingsState.getInstance().getState();
+    return state == null
+           ? ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SPEED_PERCENT
+           : ActiveTabColorSettingsState.normalizeTabCatSpeedPercent(state.tabCatSpeedPercent);
   }
 
   private static JLayeredPane findLayeredPane(Component component) {
