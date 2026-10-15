@@ -16,12 +16,17 @@ import java.util.Objects;
 @Service(Level.APP)
 @State(name = "ActiveTabColorSettings", storages = @Storage("activeTabColor.xml"))
 public final class ActiveTabColorSettingsState implements PersistentStateComponent<ActiveTabColorSettingsState.PluginState> {
+  public static final int MIN_OUTLINE_BORDER_WIDTH = 1;
+  public static final int MAX_OUTLINE_BORDER_WIDTH = 6;
   public static final String DEFAULT_TAB_CAT = "timi";
   public static final int MIN_TAB_CAT_SCALE_PERCENT = 60;
   public static final int SMALL_TAB_CAT_SCALE_PERCENT = 80;
   public static final int DEFAULT_TAB_CAT_SCALE_PERCENT = 100;
   public static final int LARGE_TAB_CAT_SCALE_PERCENT = 125;
   public static final int MAX_TAB_CAT_SCALE_PERCENT = 150;
+  public static final int MIN_TAB_CAT_SPEED_PERCENT = 50;
+  public static final int DEFAULT_TAB_CAT_SPEED_PERCENT = 100;
+  public static final int MAX_TAB_CAT_SPEED_PERCENT = 200;
   private PluginState state = new PluginState();
 
   public static ActiveTabColorSettingsState getInstance() {
@@ -44,18 +49,24 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
 
   public static final class PluginState {
     public boolean enabled = true;
+    public boolean activeOverridesRules = true;
+    public boolean showActiveTabDot;
     public boolean showTabCat;
     public String tabCat = DEFAULT_TAB_CAT;
     public int tabCatScalePercent = DEFAULT_TAB_CAT_SCALE_PERCENT;
+    public int tabCatSpeedPercent = DEFAULT_TAB_CAT_SPEED_PERCENT;
     public ColorSettings active = new ColorSettings();
     public List<TabColorRule> rules = new ArrayList<>();
 
     public PluginState copy() {
       PluginState copy = new PluginState();
       copy.enabled = enabled;
+      copy.activeOverridesRules = activeOverridesRules;
+      copy.showActiveTabDot = showActiveTabDot;
       copy.showTabCat = showTabCat;
       copy.tabCat = normalizeTabCat(tabCat);
       copy.tabCatScalePercent = normalizeTabCatScalePercent(tabCatScalePercent);
+      copy.tabCatSpeedPercent = normalizeTabCatSpeedPercent(tabCatSpeedPercent);
       copy.active = active == null ? new ColorSettings() : active.copy();
       copy.rules = new ArrayList<>();
       if (rules != null) {
@@ -75,8 +86,11 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
         return false;
       }
       return enabled == that.enabled &&
+             activeOverridesRules == that.activeOverridesRules &&
+             showActiveTabDot == that.showActiveTabDot &&
              showTabCat == that.showTabCat &&
              normalizeTabCatScalePercent(tabCatScalePercent) == normalizeTabCatScalePercent(that.tabCatScalePercent) &&
+             normalizeTabCatSpeedPercent(tabCatSpeedPercent) == normalizeTabCatSpeedPercent(that.tabCatSpeedPercent) &&
              Objects.equals(normalizeTabCat(tabCat), normalizeTabCat(that.tabCat)) &&
              Objects.equals(active, that.active) &&
              Objects.equals(rules, that.rules);
@@ -84,7 +98,9 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
 
     @Override
     public int hashCode() {
-      return Objects.hash(enabled, showTabCat, normalizeTabCat(tabCat), normalizeTabCatScalePercent(tabCatScalePercent), active, rules);
+      return Objects.hash(enabled, activeOverridesRules, showActiveTabDot, showTabCat, normalizeTabCat(tabCat),
+                          normalizeTabCatScalePercent(tabCatScalePercent),
+                          normalizeTabCatSpeedPercent(tabCatSpeedPercent), active, rules);
     }
   }
 
@@ -92,12 +108,14 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
     public @Nullable Integer backgroundRgb;
     public @Nullable Integer underlineBorderRgb;
     public @Nullable Integer outlineBorderRgb;
+    public int outlineBorderWidth = MIN_OUTLINE_BORDER_WIDTH;
 
     public ColorSettings copy() {
       ColorSettings copy = new ColorSettings();
       copy.backgroundRgb = normalizeRgb(backgroundRgb);
       copy.underlineBorderRgb = normalizeRgb(underlineBorderRgb);
       copy.outlineBorderRgb = normalizeRgb(outlineBorderRgb);
+      copy.outlineBorderWidth = normalizeOutlineBorderWidth(outlineBorderWidth);
       return copy;
     }
 
@@ -117,12 +135,13 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
       }
       return Objects.equals(backgroundRgb, that.backgroundRgb) &&
              Objects.equals(underlineBorderRgb, that.underlineBorderRgb) &&
-             Objects.equals(outlineBorderRgb, that.outlineBorderRgb);
+             Objects.equals(outlineBorderRgb, that.outlineBorderRgb) &&
+             normalizeOutlineBorderWidth(outlineBorderWidth) == normalizeOutlineBorderWidth(that.outlineBorderWidth);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(backgroundRgb, underlineBorderRgb, outlineBorderRgb);
+      return Objects.hash(backgroundRgb, underlineBorderRgb, outlineBorderRgb, normalizeOutlineBorderWidth(outlineBorderWidth));
     }
   }
 
@@ -140,6 +159,7 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
       copy.backgroundRgb = normalizeRgb(backgroundRgb);
       copy.underlineBorderRgb = normalizeRgb(underlineBorderRgb);
       copy.outlineBorderRgb = normalizeRgb(outlineBorderRgb);
+      copy.outlineBorderWidth = normalizeOutlineBorderWidth(outlineBorderWidth);
       return copy;
     }
 
@@ -165,6 +185,10 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
     }
   }
 
+  public static int normalizeOutlineBorderWidth(int width) {
+    return Math.max(MIN_OUTLINE_BORDER_WIDTH, Math.min(MAX_OUTLINE_BORDER_WIDTH, width));
+  }
+
   public static @Nullable Integer normalizeRgb(@Nullable Integer rgb) {
     return rgb == null ? null : rgb & 0x00FFFFFF;
   }
@@ -181,5 +205,9 @@ public final class ActiveTabColorSettingsState implements PersistentStateCompone
 
   public static int normalizeTabCatScalePercent(int percent) {
     return Math.max(MIN_TAB_CAT_SCALE_PERCENT, Math.min(MAX_TAB_CAT_SCALE_PERCENT, percent));
+  }
+
+  public static int normalizeTabCatSpeedPercent(int percent) {
+    return Math.max(MIN_TAB_CAT_SPEED_PERCENT, Math.min(MAX_TAB_CAT_SPEED_PERCENT, percent));
   }
 }

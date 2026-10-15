@@ -83,6 +83,42 @@ class TabStyleResolverTest {
     assertThrows(PatternSyntaxException.class, () -> TabStyleResolver.validateRules(state));
   }
 
+  @Test
+  void priorityKeepsOutlineColorAndWidthTogether() {
+    var state = new ActiveTabColorSettingsState.PluginState();
+    var rule = rule("java", "java");
+    rule.backgroundRgb = 0x111111;
+    rule.outlineBorderRgb = 0x222222;
+    rule.outlineBorderWidth = 5;
+    state.rules.add(rule);
+    state.active.backgroundRgb = 0x333333;
+    state.active.underlineBorderRgb = 0x444444;
+    state.active.outlineBorderRgb = 0x555555;
+    state.active.outlineBorderWidth = 3;
+
+    var active = TabStyleResolver.resolve(state, "A.java", true);
+    assertEquals(0x333333, active.backgroundRgb());
+    assertEquals(0x555555, active.outlineBorderRgb());
+    assertEquals(3, active.outlineBorderWidth());
+
+    state.activeOverridesRules = false;
+    var preferredRule = TabStyleResolver.resolve(state, "A.java", true);
+    assertEquals(0x111111, preferredRule.backgroundRgb());
+    assertEquals(0x444444, preferredRule.underlineBorderRgb());
+    assertEquals(0x222222, preferredRule.outlineBorderRgb());
+    assertEquals(5, preferredRule.outlineBorderWidth());
+    assertEquals(state.active.outlineBorderWidth, TabStyleResolver.resolve(state, "other", true).outlineBorderWidth());
+    assertNull(TabStyleResolver.resolve(state, "A.java", false).underlineBorderRgb());
+
+    state.activeOverridesRules = true;
+    state.active.outlineBorderRgb = null;
+    assertEquals(5, TabStyleResolver.resolve(state, "A.java", true).outlineBorderWidth());
+    rule.outlineBorderRgb = null;
+    state.active.outlineBorderRgb = 0x555555;
+    state.activeOverridesRules = false;
+    assertEquals(3, TabStyleResolver.resolve(state, "A.java", true).outlineBorderWidth());
+  }
+
   private static ActiveTabColorSettingsState.TabColorRule rule(String name, String pattern) {
     ActiveTabColorSettingsState.TabColorRule rule = new ActiveTabColorSettingsState.TabColorRule();
     rule.name = name;

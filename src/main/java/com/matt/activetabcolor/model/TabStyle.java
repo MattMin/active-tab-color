@@ -1,16 +1,19 @@
 package com.matt.activetabcolor.model;
 
+import com.matt.activetabcolor.settings.ActiveTabColorSettingsState;
 import org.jetbrains.annotations.Nullable;
 
 public record TabStyle(@Nullable Integer backgroundRgb,
                        @Nullable Integer underlineBorderRgb,
-                       @Nullable Integer outlineBorderRgb) {
-  public static final TabStyle EMPTY = new TabStyle(null, null, null);
+                       @Nullable Integer outlineBorderRgb,
+                       int outlineBorderWidth) {
+  public static final TabStyle EMPTY = new TabStyle(null, null, null, 1);
 
   public TabStyle {
     backgroundRgb = normalize(backgroundRgb);
     underlineBorderRgb = normalize(underlineBorderRgb);
     outlineBorderRgb = normalize(outlineBorderRgb);
+    outlineBorderWidth = ActiveTabColorSettingsState.normalizeOutlineBorderWidth(outlineBorderWidth);
   }
 
   public @Nullable Integer getBackgroundRgb() {
@@ -38,7 +41,8 @@ public record TabStyle(@Nullable Integer backgroundRgb,
     return new TabStyle(
       preferred.backgroundRgb != null ? preferred.backgroundRgb : backgroundRgb,
       preferred.underlineBorderRgb != null ? preferred.underlineBorderRgb : underlineBorderRgb,
-      preferred.outlineBorderRgb != null ? preferred.outlineBorderRgb : outlineBorderRgb
+      preferred.outlineBorderRgb != null ? preferred.outlineBorderRgb : outlineBorderRgb,
+      preferred.outlineBorderRgb != null ? preferred.outlineBorderWidth : outlineBorderWidth
     );
   }
 
