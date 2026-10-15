@@ -55,6 +55,7 @@ public final class ActiveTabColorRefresh {
       updateFile(manager, oldFile);
       updateFile(manager, newFile);
       ActiveTabColorDecorator.refreshSelection(project);
+      ActiveTabCatDecorator.refreshProject(project);
     };
     if (ApplicationManager.getApplication().isDispatchThread()) {
       refresh.run();
@@ -113,8 +114,10 @@ public final class ActiveTabColorRefresh {
       }
     }
     ActiveTabColorDecorator.refreshProject(project);
+    ActiveTabCatDecorator.refreshProject(project);
     if (snapshot.delayedDecorations()) {
       ActiveTabColorDecorator.refreshProjectLater(project, 100);
+      ActiveTabCatDecorator.refreshProjectLater(project, 100);
     }
   }
 

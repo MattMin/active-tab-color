@@ -6,7 +6,10 @@
 
 Active Tab Color 是一个 IntelliJ-based 插件，用于自定义编辑器 tab 的颜色。它既可以为当前选中的 active tab 设置专属样式，也可以通过正则规则为符合名称的 tab 批量设置样式。
 
+插件也提供可选的 Tab Cat 小猫伴侣，小猫会在编辑器 tab 栏上走动、奔跑、坐下和眨眼。
+
 ![Settings](img/settings.png)
+![tab_cat](img/tab_cat.gif)
 
 ## 兼容性
 
@@ -24,7 +27,17 @@ Active Tab Color 是一个 IntelliJ-based 插件，用于自定义编辑器 tab 
 - 添加多条 tab 配色规则，通过正则匹配 tab 上显示的文件名。
 - 规则支持启用/停用、删除、上移、下移。
 - 每条规则可以单独配置背景色、下划线边框色、外框色。
+- 可显示或隐藏一个动画 tab 小猫。
+- 小猫素材支持从多个小猫中选择。
 - 插件首次启用时不会修改任何 tab 样式，只有手动勾选并选择颜色后才会生效。
+
+### 外框粗细与选中状态
+
+`Active tab` 和规则的 `Outline border` 颜色后均可设置粗细（1–6 个逻辑像素，默认 1，随 IDE 显示缩放）。启用外框颜色后才能编辑粗细。
+
+`Active tab styles override rules` 默认开启，选中样式优先；关闭后规则优先，规则未配置的项仍使用选中样式。外框颜色和粗细一起继承。
+
+`Show active tab dot` 默认关闭。开启后，每个分屏选中 Tab 的左上角显示主题强调色圆点，即使没有配置颜色也可显示。关闭颜色定制总开关时圆点隐藏。
 
 ## 设置入口
 
@@ -35,6 +48,34 @@ Settings > Tools > Active Tab Color
 ```
 
 进入配置页面。
+
+## 导出与导入配置
+
+- `Export Settings…`：将全部已保存的插件配置导出为 UTF-8 JSON 文件，默认文件名为 `active-tab-color-settings.json`，不包含尚未 Apply 的编辑。可选择电脑上的保存位置，覆盖已有文件时需要确认。
+- `Import Settings…`：选择本功能导出的配置文件，完整替换设置页内容，包含全部规则及顺序。点击 `Apply`/`OK` 才保存并刷新所有项目，点击 `Cancel` 可放弃导入。
+- 文件格式或配置内容不合法时显示错误，并保留设置页内容和已保存配置。取消文件选择不会产生变更。
+
+## Tab Cat 小猫
+
+勾选 `Show tab cat` 后，会在编辑器 tab 栏上显示一只动画小猫。
+
+- `Tab cat`：选择一个可用的小猫素材。
+- 选择框旁边会展示当前小猫预览。
+- 小猫会走向较近的 active tab，距离较远时会跑过去。
+- 到达 active tab 后，小猫会坐下，并偶尔短暂眨眼。
+- 如果打开、关闭或调整 Tool Window 导致 tab 位置变化，小猫会重新计算 active tab 的位置。
+
+也可以通过菜单开关小猫：
+
+```text
+Tools > Show Tab Cat
+```
+
+默认快捷键：
+
+```text
+Ctrl+Alt+Shift+C
+```
 
 ## Active Tab 配置
 
@@ -68,7 +109,7 @@ README.md
 
 这个规则会匹配所有 tab 名称中包含 `Service` 的文件，例如 `UserService.java`、`OrderService.kt`。
 
-如果一个 active tab 同时命中了 active 配置和规则配置：
+默认开启 `Active tab styles override rules` 时，如果一个 active tab 同时命中了 active 配置和规则配置：
 
 - active tab 中已勾选的颜色项优先。
 - active tab 中未勾选的颜色项可以继续使用命中的规则颜色。

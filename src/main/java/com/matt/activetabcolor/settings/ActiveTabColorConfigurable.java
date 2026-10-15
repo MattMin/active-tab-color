@@ -1,7 +1,12 @@
 package com.matt.activetabcolor.settings;
 
+import com.intellij.openapi.fileChooser.FileChooser;
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
+import com.intellij.openapi.fileChooser.FileChooserFactory;
+import com.intellij.openapi.fileChooser.FileSaverDescriptor;
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.options.ConfigurationException;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.ColorPanel;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBCheckBox;
@@ -17,12 +22,17 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComponent;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
+import javax.swing.JSlider;
+import javax.swing.JSpinner;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
@@ -30,15 +40,39 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.BorderLayout;
+import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Image;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.io.IOException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Hashtable;
 import java.util.Objects;
 import java.util.regex.PatternSyntaxException;
 
 public final class ActiveTabColorConfigurable implements Configurable {
+  private static final int TAB_CAT_SLIDER_PREFERRED_WIDTH = 180;
+  private static final int RULES_HELP_TEXT_COLUMNS = 22;
+  private static final int RULE_TEXT_FIELD_COLUMNS = 20;
+  private static final int RULE_LIST_PREFERRED_WIDTH = 160;
+
   private JPanel rootPanel;
   private JCheckBox enabledCheckBox;
+  private JCheckBox activeOverridesRulesCheckBox;
+  private JCheckBox showActiveTabDotCheckBox;
+  private JCheckBox showTabCatCheckBox;
+  private JComboBox<CatOption> tabCatComboBox;
+  private JLabel tabCatPreviewLabel;
+  private JSlider tabCatSizeSlider;
+  private JLabel tabCatSizeValueLabel;
+  private JSlider tabCatSpeedSlider;
+  private JLabel tabCatSpeedValueLabel;
   private ColorRow activeBackground;
   private ColorRow activeUnderline;
   private ColorRow activeOutline;
@@ -60,15 +94,17 @@ public final class ActiveTabColorConfigurable implements Configurable {
   @Override
   public @Nullable JComponent createComponent() {
     rootPanel = new JPanel(new BorderLayout());
+    rootPanel.setMinimumSize(new Dimension(0, 0));
     rootPanel.setBorder(JBUI.Borders.empty(8));
 
-    enabledCheckBox = new JBCheckBox("Enable tab color customization");
-    rootPanel.add(enabledCheckBox, BorderLayout.NORTH);
+    rootPanel.add(createTopPanel(), BorderLayout.NORTH);
 
     JPanel content = new JPanel(new BorderLayout(JBUI.scale(12), 0));
+    content.setMinimumSize(new Dimension(0, 0));
     content.add(createActivePanel(), BorderLayout.NORTH);
     content.add(createRulesPanel(), BorderLayout.CENTER);
     rootPanel.add(content, BorderLayout.CENTER);
+    rootPanel.add(createTransferPanel(), BorderLayout.SOUTH);
 
     reset();
     return rootPanel;
@@ -97,11 +133,22 @@ public final class ActiveTabColorConfigurable implements Configurable {
     if (rootPanel == null) {
       return;
     }
-    ActiveTabColorSettingsState.PluginState state = ActiveTabColorSettingsState.getInstance().getState().copy();
+    fillUi(ActiveTabColorSettingsState.getInstance().getState().copy());
+  }
+
+  private void fillUi(ActiveTabColorSettingsState.PluginState state) {
     enabledCheckBox.setSelected(state.enabled);
+    activeOverridesRulesCheckBox.setSelected(state.activeOverridesRules);
+    showActiveTabDotCheckBox.setSelected(state.showActiveTabDot);
+    showTabCatCheckBox.setSelected(state.showTabCat);
+    selectTabCat(state.tabCat);
+    setTabCatScalePercent(state.tabCatScalePercent);
+    setTabCatSpeedPercent(state.tabCatSpeedPercent);
+    updateTabCatControls();
     activeBackground.setRgb(state.active.backgroundRgb);
     activeUnderline.setRgb(state.active.underlineBorderRgb);
     activeOutline.setRgb(state.active.outlineBorderRgb);
+    activeOutline.setWidth(state.active.outlineBorderWidth);
 
     rulesModel.clear();
     if (state.rules != null) {
@@ -122,22 +169,286 @@ public final class ActiveTabColorConfigurable implements Configurable {
     rootPanel = null;
   }
 
+  private JComponent createTransferPanel() {
+    JPanel panel = new JPanel(new BorderLayout());
+    panel.setBorder(JBUI.Borders.emptyTop(8));
+    JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0));
+    JButton export = new JButton("Export Settings…");
+    JButton importSettings = new JButton("Import Settings…");
+    export.addActionListener(e -> exportSettings());
+    importSettings.addActionListener(e -> importSettings());
+    buttons.add(export);
+    buttons.add(importSettings);
+    panel.add(buttons, BorderLayout.NORTH);
+    JTextArea help = new JTextArea("Export backs up saved settings only. Import replaces this page.\n"
+                                  + "Click Apply/OK to save imported settings, or Cancel to discard them.");
+    help.setEditable(false);
+    help.setRows(2);
+    help.setOpaque(false);
+    help.setLineWrap(true);
+    help.setWrapStyleWord(true);
+    help.setFont(new JLabel().getFont());
+    panel.add(help, BorderLayout.CENTER);
+    return panel;
+  }
+
+  private void exportSettings() {
+    var descriptor = new FileSaverDescriptor("Export Active Tab Color Settings", "Save the current saved configuration", "json");
+    var file = FileChooserFactory.getInstance().createSaveFileDialog(descriptor, rootPanel)
+      .save("active-tab-color-settings.json");
+    if (file == null) {
+      return;
+    }
+    Path path = file.getFile().toPath();
+    if (Files.exists(path) && Messages.showYesNoDialog(rootPanel, "Replace the existing configuration file?",
+        "Export Active Tab Color Settings", Messages.getQuestionIcon()) != Messages.YES) {
+      return;
+    }
+    try {
+      SettingsFile.write(path, ActiveTabColorSettingsState.getInstance().getState().copy());
+      Messages.showInfoMessage(rootPanel, "Saved settings exported successfully.", "Export Active Tab Color Settings");
+    }
+    catch (IOException e) {
+      Messages.showErrorDialog(rootPanel, "Could not export settings: " + e.getMessage(), "Export Active Tab Color Settings");
+    }
+  }
+
+  private void importSettings() {
+    var descriptor = FileChooserDescriptorFactory.createSingleLocalFileDescriptor();
+    descriptor.setTitle("Import Active Tab Color Settings");
+    var file = FileChooser.chooseFile(descriptor, rootPanel, null, null);
+    if (file == null) {
+      return;
+    }
+    try {
+      var imported = SettingsFile.read(file.toNioPath());
+      fillUi(imported);
+      Messages.showInfoMessage(rootPanel, "Settings imported into this page. Click Apply/OK to save, or Cancel to discard.",
+                               "Import Active Tab Color Settings");
+    }
+    catch (IOException e) {
+      Messages.showErrorDialog(rootPanel, "Could not import settings: " + e.getMessage(), "Import Active Tab Color Settings");
+    }
+  }
+
   private JComponent createActivePanel() {
     JPanel panel = new JPanel(new GridBagLayout());
+    panel.setMinimumSize(new Dimension(0, 0));
     panel.setBorder(BorderFactory.createTitledBorder("Active tab"));
     activeBackground = new ColorRow("Background");
     activeUnderline = new ColorRow("Underline border");
-    activeOutline = new ColorRow("Outline border");
+    activeOutline = new ColorRow("Outline border", true);
 
     addColorRow(panel, activeBackground, 0);
     addColorRow(panel, activeUnderline, 1);
     addColorRow(panel, activeOutline, 2);
-    addVerticalFiller(panel, 3);
+    activeOverridesRulesCheckBox = new JBCheckBox("Active tab styles override rules");
+    activeOverridesRulesCheckBox.setToolTipText("When unchecked, rule styles take priority; missing items use active tab styles.");
+    showActiveTabDotCheckBox = new JBCheckBox("Show active tab dot");
+    GridBagConstraints c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 3;
+    c.gridwidth = 2;
+    panel.add(activeOverridesRulesCheckBox, c);
+    c.gridy = 4;
+    panel.add(showActiveTabDotCheckBox, c);
+    addVerticalFiller(panel, 5);
     return panel;
+  }
+
+  private JComponent createTopPanel() {
+    JPanel panel = new JPanel(new GridBagLayout());
+    panel.setMinimumSize(new Dimension(0, 0));
+    enabledCheckBox = new JBCheckBox("Enable tab color customization");
+    showTabCatCheckBox = new JBCheckBox("Show tab cat");
+    tabCatComboBox = new JComboBox<>(CatOption.ALL);
+    tabCatComboBox.setPreferredSize(JBUI.size(120, tabCatComboBox.getPreferredSize().height));
+    tabCatComboBox.setMinimumSize(new Dimension(0, tabCatComboBox.getMinimumSize().height));
+    tabCatPreviewLabel = new JLabel();
+    tabCatPreviewLabel.setHorizontalAlignment(JLabel.CENTER);
+    tabCatPreviewLabel.setPreferredSize(JBUI.size(88, 64));
+    tabCatPreviewLabel.setMinimumSize(JBUI.size(0, 64));
+    tabCatSizeSlider = new JSlider(
+      ActiveTabColorSettingsState.MIN_TAB_CAT_SCALE_PERCENT,
+      ActiveTabColorSettingsState.MAX_TAB_CAT_SCALE_PERCENT,
+      ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT
+    );
+    tabCatSizeSlider.setMajorTickSpacing(10);
+    tabCatSizeSlider.setPaintTicks(true);
+    // tabCatSizeSlider.setPaintLabels(true);
+    // tabCatSizeSlider.setLabelTable(createTabCatSizeLabels());
+    tabCatSizeSlider.setPreferredSize(JBUI.size(TAB_CAT_SLIDER_PREFERRED_WIDTH, tabCatSizeSlider.getPreferredSize().height));
+    tabCatSizeSlider.setMinimumSize(JBUI.size(0, tabCatSizeSlider.getMinimumSize().height));
+    tabCatSizeValueLabel = new JLabel(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT + "%");
+    tabCatSizeValueLabel.setPreferredSize(JBUI.size(42, tabCatSizeValueLabel.getPreferredSize().height));
+    tabCatSpeedSlider = new JSlider(
+      ActiveTabColorSettingsState.MIN_TAB_CAT_SPEED_PERCENT,
+      ActiveTabColorSettingsState.MAX_TAB_CAT_SPEED_PERCENT,
+      ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SPEED_PERCENT
+    );
+    tabCatSpeedSlider.setMajorTickSpacing(25);
+    tabCatSpeedSlider.setPaintTicks(true);
+    tabCatSpeedSlider.setPreferredSize(JBUI.size(TAB_CAT_SLIDER_PREFERRED_WIDTH, tabCatSpeedSlider.getPreferredSize().height));
+    tabCatSpeedSlider.setMinimumSize(JBUI.size(0, tabCatSpeedSlider.getMinimumSize().height));
+    tabCatSpeedValueLabel = new JLabel(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SPEED_PERCENT + "%");
+    tabCatSpeedValueLabel.setPreferredSize(JBUI.size(42, tabCatSpeedValueLabel.getPreferredSize().height));
+    showTabCatCheckBox.addActionListener(e -> updateTabCatControls());
+    tabCatComboBox.addActionListener(e -> updateTabCatPreview());
+    tabCatSizeSlider.addChangeListener(e -> updateTabCatSizeUi());
+    tabCatSpeedSlider.addChangeListener(e -> updateTabCatSpeedUi());
+
+    GridBagConstraints c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 0;
+    c.gridwidth = 3;
+    panel.add(showTabCatCheckBox, c);
+    addHorizontalFiller(panel, 3, 0);
+
+    c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 1;
+    panel.add(new JLabel("Tab cat"), c);
+
+    c = baseConstraints();
+    c.gridx = 1;
+    c.gridy = 1;
+    panel.add(tabCatComboBox, c);
+
+    c = baseConstraints();
+    c.gridx = 2;
+    c.gridy = 1;
+    panel.add(tabCatPreviewLabel, c);
+    addHorizontalFiller(panel, 3, 1);
+
+    c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 2;
+    panel.add(new JLabel("Size"), c);
+
+    c = baseConstraints();
+    c.gridx = 1;
+    c.gridy = 2;
+    c.fill = GridBagConstraints.NONE;
+    panel.add(createTabCatSizePanel(), c);
+
+    c = baseConstraints();
+    c.gridx = 2;
+    c.gridy = 2;
+    panel.add(tabCatSizeValueLabel, c);
+    addHorizontalFiller(panel, 3, 2);
+
+    c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 3;
+    panel.add(new JLabel("Speed"), c);
+
+    c = baseConstraints();
+    c.gridx = 1;
+    c.gridy = 3;
+    c.fill = GridBagConstraints.NONE;
+    panel.add(tabCatSpeedSlider, c);
+
+    c = baseConstraints();
+    c.gridx = 2;
+    c.gridy = 3;
+    panel.add(tabCatSpeedValueLabel, c);
+    addHorizontalFiller(panel, 3, 3);
+
+    c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 4;
+    c.gridwidth = 3;
+    panel.add(enabledCheckBox, c);
+    addHorizontalFiller(panel, 3, 4);
+    return panel;
+  }
+
+  private JPanel createTabCatSizePanel() {
+    JPanel panel = new JPanel(new GridBagLayout());
+    panel.setMinimumSize(new Dimension(0, 0));
+
+    GridBagConstraints c = baseConstraints();
+    c.gridx = 0;
+    c.fill = GridBagConstraints.NONE;
+    panel.add(tabCatSizeSlider, c);
+    return panel;
+  }
+
+  private Hashtable<Integer, JLabel> createTabCatSizeLabels() {
+    Hashtable<Integer, JLabel> labels = new Hashtable<>();
+    JLabel defaultLabel = new JLabel("Default");
+    defaultLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    defaultLabel.setToolTipText("Restore default size");
+    defaultLabel.addMouseListener(new MouseAdapter() {
+      @Override
+      public void mouseClicked(MouseEvent e) {
+        if (tabCatSizeSlider.isEnabled()) {
+          setTabCatScalePercent(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT);
+        }
+      }
+    });
+    labels.put(ActiveTabColorSettingsState.DEFAULT_TAB_CAT_SCALE_PERCENT, defaultLabel);
+    return labels;
+  }
+
+  private void selectTabCat(String tabCat) {
+    String normalized = ActiveTabColorSettingsState.normalizeTabCat(tabCat);
+    for (CatOption option : CatOption.ALL) {
+      if (option.id.equals(normalized)) {
+        tabCatComboBox.setSelectedItem(option);
+        return;
+      }
+    }
+    tabCatComboBox.setSelectedItem(CatOption.ALL[0]);
+  }
+
+  private void updateTabCatControls() {
+    boolean enabled = showTabCatCheckBox.isSelected();
+    tabCatComboBox.setEnabled(enabled);
+    tabCatPreviewLabel.setEnabled(enabled);
+    tabCatSizeSlider.setEnabled(enabled);
+    tabCatSizeValueLabel.setEnabled(enabled);
+    tabCatSpeedSlider.setEnabled(enabled);
+    tabCatSpeedValueLabel.setEnabled(enabled);
+    updateTabCatPreview();
+  }
+
+  private void updateTabCatPreview() {
+    CatOption option = (CatOption)tabCatComboBox.getSelectedItem();
+    tabCatPreviewLabel.setIcon(option == null ? null : option.previewIcon(readTabCatScalePercent()));
+  }
+
+  private void setTabCatScalePercent(int scalePercent) {
+    tabCatSizeSlider.setValue(ActiveTabColorSettingsState.normalizeTabCatScalePercent(scalePercent));
+    updateTabCatSizeUi();
+  }
+
+  private int readTabCatScalePercent() {
+    return ActiveTabColorSettingsState.normalizeTabCatScalePercent(tabCatSizeSlider.getValue());
+  }
+
+  private void updateTabCatSizeUi() {
+    int scalePercent = readTabCatScalePercent();
+    tabCatSizeValueLabel.setText(scalePercent + "%");
+    updateTabCatPreview();
+  }
+
+  private void setTabCatSpeedPercent(int speedPercent) {
+    tabCatSpeedSlider.setValue(ActiveTabColorSettingsState.normalizeTabCatSpeedPercent(speedPercent));
+    updateTabCatSpeedUi();
+  }
+
+  private int readTabCatSpeedPercent() {
+    return ActiveTabColorSettingsState.normalizeTabCatSpeedPercent(tabCatSpeedSlider.getValue());
+  }
+
+  private void updateTabCatSpeedUi() {
+    tabCatSpeedValueLabel.setText(readTabCatSpeedPercent() + "%");
   }
 
   private JComponent createRulesPanel() {
     JPanel panel = new JPanel(new BorderLayout(JBUI.scale(8), 0));
+    panel.setMinimumSize(new Dimension(0, 0));
     panel.setBorder(BorderFactory.createTitledBorder("Rules"));
 
     rulesModel = new DefaultListModel<>();
@@ -150,7 +461,12 @@ public final class ActiveTabColorConfigurable implements Configurable {
     });
 
     JPanel listPanel = new JPanel(new BorderLayout(0, JBUI.scale(6)));
-    listPanel.add(new JBScrollPane(rulesList), BorderLayout.CENTER);
+    listPanel.setMinimumSize(new Dimension(0, 0));
+    JBScrollPane rulesScrollPane = new JBScrollPane(rulesList);
+    Dimension rulesScrollPreferredSize = rulesScrollPane.getPreferredSize();
+    rulesScrollPane.setPreferredSize(JBUI.size(RULE_LIST_PREFERRED_WIDTH, rulesScrollPreferredSize.height));
+    rulesScrollPane.setMinimumSize(JBUI.size(0, rulesScrollPane.getMinimumSize().height));
+    listPanel.add(rulesScrollPane, BorderLayout.CENTER);
     listPanel.add(createRuleButtons(), BorderLayout.SOUTH);
     panel.add(listPanel, BorderLayout.WEST);
     panel.add(createRuleEditor(), BorderLayout.CENTER);
@@ -169,23 +485,32 @@ public final class ActiveTabColorConfigurable implements Configurable {
     up.addActionListener(e -> moveRule(-1));
     down.addActionListener(e -> moveRule(1));
 
-    panel.add(add);
-    panel.add(remove);
-    panel.add(up);
-    panel.add(down);
+    GridBagConstraints c = new GridBagConstraints();
+    c.insets = JBUI.insets(1);
+    c.gridx = 0;
+    c.gridy = 0;
+    panel.add(add, c);
+    c.gridx = 1;
+    panel.add(remove, c);
+    c.gridx = 0;
+    c.gridy = 1;
+    panel.add(up, c);
+    c.gridx = 1;
+    panel.add(down, c);
     return panel;
   }
 
   private JComponent createRuleEditor() {
     JPanel panel = new JPanel(new GridBagLayout());
+    panel.setMinimumSize(new Dimension(0, 0));
     panel.setBorder(JBUI.Borders.emptyLeft(8));
 
     ruleEnabled = new JBCheckBox("Enabled");
-    ruleName = new JBTextField();
-    rulePattern = new JBTextField();
+    ruleName = new JBTextField(RULE_TEXT_FIELD_COLUMNS);
+    rulePattern = new JBTextField(RULE_TEXT_FIELD_COLUMNS);
     ruleBackground = new ColorRow("Background");
     ruleUnderline = new ColorRow("Underline border");
-    ruleOutline = new ColorRow("Outline border");
+    ruleOutline = new ColorRow("Outline border", true);
 
     ruleEnabled.addActionListener(e -> updateSelectedRule());
     installDocumentListener(ruleName);
@@ -223,9 +548,11 @@ public final class ActiveTabColorConfigurable implements Configurable {
     text.setOpaque(false);
     text.setLineWrap(true);
     text.setWrapStyleWord(true);
-    text.setRows(2);
-    text.setColumns(42);
+    text.setRows(3);
+    text.setColumns(RULES_HELP_TEXT_COLUMNS);
+    text.setMinimumSize(new Dimension(0, 0));
     text.setBorder(JBUI.Borders.emptyBottom(2));
+    freezePreferredSize(text);
     return text;
   }
 
@@ -279,6 +606,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     ruleBackground.setRgb(rule == null ? null : rule.backgroundRgb);
     ruleUnderline.setRgb(rule == null ? null : rule.underlineBorderRgb);
     ruleOutline.setRgb(rule == null ? null : rule.outlineBorderRgb);
+    ruleOutline.setWidth(rule == null ? 1 : rule.outlineBorderWidth);
     loadingRule = false;
   }
 
@@ -296,15 +624,24 @@ public final class ActiveTabColorConfigurable implements Configurable {
     rule.backgroundRgb = ruleBackground.getRgb();
     rule.underlineBorderRgb = ruleUnderline.getRgb();
     rule.outlineBorderRgb = ruleOutline.getRgb();
+    rule.outlineBorderWidth = ruleOutline.getWidth();
     rulesList.repaint();
   }
 
   private ActiveTabColorSettingsState.PluginState readStateFromUi() {
     ActiveTabColorSettingsState.PluginState state = new ActiveTabColorSettingsState.PluginState();
     state.enabled = enabledCheckBox.isSelected();
+    state.activeOverridesRules = activeOverridesRulesCheckBox.isSelected();
+    state.showActiveTabDot = showActiveTabDotCheckBox.isSelected();
+    state.showTabCat = showTabCatCheckBox.isSelected();
+    CatOption tabCat = (CatOption)tabCatComboBox.getSelectedItem();
+    state.tabCat = tabCat == null ? ActiveTabColorSettingsState.DEFAULT_TAB_CAT : tabCat.id;
+    state.tabCatScalePercent = readTabCatScalePercent();
+    state.tabCatSpeedPercent = readTabCatSpeedPercent();
     state.active.backgroundRgb = activeBackground.getRgb();
     state.active.underlineBorderRgb = activeUnderline.getRgb();
     state.active.outlineBorderRgb = activeOutline.getRgb();
+    state.active.outlineBorderWidth = activeOutline.getWidth();
 
     for (int i = 0; i < rulesModel.size(); i++) {
       state.rules.add(rulesModel.get(i).toRule());
@@ -323,6 +660,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     fieldConstraints.gridy = row;
     fieldConstraints.weightx = 1;
     fieldConstraints.fill = GridBagConstraints.HORIZONTAL;
+    field.setMinimumSize(new Dimension(0, field.getMinimumSize().height));
     panel.add(field, fieldConstraints);
   }
 
@@ -344,7 +682,28 @@ public final class ActiveTabColorConfigurable implements Configurable {
     constraints.weightx = 1;
     constraints.weighty = 1;
     constraints.fill = GridBagConstraints.BOTH;
-    panel.add(new JPanel(), constraints);
+    panel.add(createZeroSizePanel(), constraints);
+  }
+
+  private void addHorizontalFiller(JPanel panel, int column, int row) {
+    GridBagConstraints constraints = new GridBagConstraints();
+    constraints.gridx = column;
+    constraints.gridy = row;
+    constraints.weightx = 1;
+    constraints.fill = GridBagConstraints.HORIZONTAL;
+    panel.add(createZeroSizePanel(), constraints);
+  }
+
+  private static void freezePreferredSize(JComponent component) {
+    Dimension preferredSize = component.getPreferredSize();
+    component.setPreferredSize(new Dimension(preferredSize.width, preferredSize.height));
+  }
+
+  private static JPanel createZeroSizePanel() {
+    JPanel panel = new JPanel();
+    panel.setMinimumSize(new Dimension(0, 0));
+    panel.setPreferredSize(new Dimension(0, 0));
+    return panel;
   }
 
   private GridBagConstraints baseConstraints() {
@@ -380,6 +739,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     private Integer backgroundRgb;
     private Integer underlineBorderRgb;
     private Integer outlineBorderRgb;
+    private int outlineBorderWidth = 1;
 
     private static RuleModel fromRule(ActiveTabColorSettingsState.TabColorRule rule) {
       RuleModel model = new RuleModel();
@@ -389,6 +749,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
       model.backgroundRgb = rule.backgroundRgb;
       model.underlineBorderRgb = rule.underlineBorderRgb;
       model.outlineBorderRgb = rule.outlineBorderRgb;
+      model.outlineBorderWidth = rule.outlineBorderWidth;
       return model;
     }
 
@@ -400,6 +761,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
       rule.backgroundRgb = backgroundRgb;
       rule.underlineBorderRgb = underlineBorderRgb;
       rule.outlineBorderRgb = outlineBorderRgb;
+      rule.outlineBorderWidth = outlineBorderWidth;
       return rule;
     }
 
@@ -410,6 +772,62 @@ public final class ActiveTabColorConfigurable implements Configurable {
     }
   }
 
+  private static final class CatOption {
+    private static final CatOption[] ALL = {
+      new CatOption("timi", "Timi"),
+      new CatOption("luna", "Luna"),
+      new CatOption("siri", "Siri")
+    };
+
+    private final String id;
+    private final String displayName;
+    private ImageIcon[] previewIcons = new ImageIcon[ActiveTabColorSettingsState.MAX_TAB_CAT_SCALE_PERCENT + 1];
+
+    private CatOption(String id, String displayName) {
+      this.id = id;
+      this.displayName = displayName;
+    }
+
+    private ImageIcon previewIcon(int scalePercent) {
+      int normalizedScalePercent = ActiveTabColorSettingsState.normalizeTabCatScalePercent(scalePercent);
+      if (previewIcons[normalizedScalePercent] == null) {
+        URL resource = ActiveTabColorConfigurable.class.getResource("/icons/cat/" + id + "/sit.png");
+        if (resource != null) {
+          ImageIcon sourceIcon = new ImageIcon(resource);
+          Dimension previewSize = scaledSize(
+            sourceIcon.getIconWidth(),
+            sourceIcon.getIconHeight(),
+            scaleDimension(JBUI.scale(52), normalizedScalePercent),
+            scaleDimension(JBUI.scale(38), normalizedScalePercent)
+          );
+          Image image = sourceIcon.getImage().getScaledInstance(previewSize.width, previewSize.height, Image.SCALE_SMOOTH);
+          previewIcons[normalizedScalePercent] = new ImageIcon(image);
+        }
+        else {
+          previewIcons[normalizedScalePercent] = new ImageIcon();
+        }
+      }
+      return previewIcons[normalizedScalePercent];
+    }
+
+    private static int scaleDimension(int value, int scalePercent) {
+      return Math.max(1, (int)Math.round(value * scalePercent / 100.0d));
+    }
+
+    private static Dimension scaledSize(int width, int height, int maxWidth, int maxHeight) {
+      if (width <= 0 || height <= 0) {
+        return new Dimension(maxWidth, maxHeight);
+      }
+      double scale = Math.min(maxWidth / (double)width, maxHeight / (double)height);
+      return new Dimension(Math.max(1, (int)Math.round(width * scale)), Math.max(1, (int)Math.round(height * scale)));
+    }
+
+    @Override
+    public String toString() {
+      return displayName;
+    }
+  }
+
   private static final class ColorRow {
     private static final int DEFAULT_RGB = 0x4C9AFF;
 
@@ -417,9 +835,23 @@ public final class ActiveTabColorConfigurable implements Configurable {
     private final JCheckBox useCheckBox = new JBCheckBox();
     private final ColorPanel colorPanel = new ColorPanel();
     private final JButton clearButton = new JButton("Clear");
+    private final JSpinner widthSpinner;
     private Runnable onChange;
 
     private ColorRow(String label) {
+      this(label, false);
+    }
+
+    private ColorRow(String label, boolean outline) {
+      widthSpinner = outline ? new JSpinner(new SpinnerNumberModel(1, 1, 6, 1)) : null;
+      if (widthSpinner != null) {
+        widthSpinner.getAccessibleContext().setAccessibleName("Outline border width");
+        widthSpinner.setToolTipText("Outline border width (1–6 logical pixels)");
+        // Commit valid typed values immediately so Apply also captures edits without focus loss.
+        ((javax.swing.text.DefaultFormatter)((JSpinner.DefaultEditor)widthSpinner.getEditor())
+          .getTextField().getFormatter()).setCommitsOnValidEdit(true);
+        widthSpinner.addChangeListener(e -> notifyChanged());
+      }
       JLabel labelComponent = new JLabel(label);
       panel.setMinimumSize(new Dimension(0, 0));
       colorPanel.setEditable(true);
@@ -455,11 +887,15 @@ public final class ActiveTabColorConfigurable implements Configurable {
       c.gridx = 2;
       panel.add(colorPanel, c);
       c.gridx = 3;
+      if (widthSpinner != null) {
+        panel.add(widthSpinner, c);
+        c.gridx++;
+      }
       panel.add(clearButton, c);
-      c.gridx = 4;
+      c.gridx++;
       c.weightx = 1;
       c.fill = GridBagConstraints.HORIZONTAL;
-      panel.add(new JPanel(), c);
+      panel.add(createZeroSizePanel(), c);
       updateEnabled();
     }
 
@@ -478,6 +914,14 @@ public final class ActiveTabColorConfigurable implements Configurable {
       updateEnabled();
     }
 
+    private void setWidth(int width) {
+      widthSpinner.setValue(ActiveTabColorSettingsState.normalizeOutlineBorderWidth(width));
+    }
+
+    private int getWidth() {
+      return (Integer)widthSpinner.getValue();
+    }
+
     private Integer getRgb() {
       return useCheckBox.isSelected() ? ColorUtil.toRgb(colorPanel.getSelectedColor()) : null;
     }
@@ -489,7 +933,11 @@ public final class ActiveTabColorConfigurable implements Configurable {
     }
 
     private void updateEnabled() {
-      colorPanel.setEnabled(useCheckBox.isEnabled() && useCheckBox.isSelected());
+      boolean enabled = useCheckBox.isEnabled() && useCheckBox.isSelected();
+      colorPanel.setEnabled(enabled);
+      if (widthSpinner != null) {
+        widthSpinner.setEnabled(enabled);
+      }
     }
 
     private void notifyChanged() {

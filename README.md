@@ -6,7 +6,10 @@
 
 Active Tab Color is an IntelliJ Platform-based plugin for customizing editor tab colors. It can style the active tab separately, and it can also apply color rules to tabs whose displayed names match a regular expression.
 
+It also includes an optional Tab Cat companion that walks, runs, sits, and blinks on the editor tab bar.
+
 ![Settings](img/settings.png)
+![tab_cat](img/tab_cat.gif)
 
 ## Compatibility
 
@@ -24,7 +27,17 @@ The plugin has been verified with IntelliJ IDEA Community `2024.1.7` and Intelli
 - Add multiple tab color rules based on regular expressions.
 - Enable, disable, delete, move up, or move down rules.
 - Configure background, underline border, and outline border colors independently for each rule.
+- Show or hide an optional animated tab cat companion.
+- Choose from multiple tab cat sprite sets.
 - The plugin does not change tab appearance by default. Colors are applied only after you manually enable a color item and choose a color.
+
+### Outline width and selection
+
+Both active tab and rule `Outline border` color controls include a width spinner (1–6 logical pixels, default 1, scaled with the IDE). The spinner is enabled only when the outline color is enabled.
+
+`Active tab styles override rules` is enabled by default. When disabled, rule styles take priority and missing items use active tab styles. Outline color and width are inherited together.
+
+`Show active tab dot` is disabled by default. When enabled, each split's selected tab shows a theme accent dot in its top-left corner, even without configured colors. Disabling tab color customization hides the dot.
 
 ## Settings
 
@@ -32,6 +45,34 @@ After installing the plugin, open:
 
 ```text
 Settings > Tools > Active Tab Color
+```
+
+## Export and Import Settings
+
+- `Export Settings…` saves all saved plugin settings to a UTF-8 JSON file (default: `active-tab-color-settings.json`). Pending edits are excluded. Choose a location on your computer and confirm before overwriting an existing file.
+- `Import Settings…` opens a configuration file exported by this feature. It replaces the settings page, including all rules and their order. Click `Apply`/`OK` to save and refresh all projects, or `Cancel` to discard the import.
+- Invalid files show an error and leave both the settings page and saved configuration unchanged. Cancelling the file dialog makes no changes.
+
+## Tab Cat
+
+The `Show tab cat` option enables an animated cat on the editor tab bar.
+
+- `Tab cat`: choose one of the available cat sprite sets.
+- The preview next to the selector shows the selected cat.
+- The cat walks to nearby active tabs and runs to farther active tabs.
+- After reaching the active tab, the cat sits and blinks occasionally.
+- If the tab bar moves because tool windows open, close, or resize, the cat recalculates the active tab position.
+
+You can also toggle the tab cat from:
+
+```text
+Tools > Show Tab Cat
+```
+
+Default shortcut:
+
+```text
+Ctrl+Alt+Shift+C
 ```
 
 ## Active Tab Settings
@@ -66,7 +107,7 @@ Example:
 
 This matches tab names containing `Service`, such as `UserService.java` or `OrderService.kt`.
 
-If an active tab also matches a rule:
+With `Active tab styles override rules` enabled (the default), if an active tab also matches a rule:
 
 - Configured active tab color options take priority.
 - Active tab options that are not configured can still use the matching rule's colors.

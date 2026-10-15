@@ -37,7 +37,7 @@ public final class TabStyleResolver {
     }
 
     TabStyle activeStyle = toStyle(state.active);
-    return ruleStyle.overlay(activeStyle);
+    return state.activeOverridesRules ? ruleStyle.overlay(activeStyle) : activeStyle.overlay(ruleStyle);
   }
 
   public static void validateRules(@NotNull ActiveTabColorSettingsState.PluginState state) throws PatternSyntaxException {
@@ -89,7 +89,8 @@ public final class TabStyleResolver {
     return new TabStyle(
       settings.backgroundRgb,
       settings.underlineBorderRgb,
-      settings.outlineBorderRgb
+      settings.outlineBorderRgb,
+      settings.outlineBorderWidth
     );
   }
 
