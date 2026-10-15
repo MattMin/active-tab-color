@@ -3,6 +3,7 @@ package com.matt.activetabcolor.ui;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx;
 import com.intellij.openapi.project.Project;
+import com.intellij.ui.JBColor;
 import com.intellij.ui.tabs.JBTabs;
 import com.intellij.ui.tabs.TabInfo;
 import com.intellij.util.concurrency.EdtExecutorService;
@@ -13,7 +14,9 @@ import com.matt.activetabcolor.settings.ActiveTabColorSettingsState;
 
 import javax.swing.JComponent;
 import javax.swing.border.Border;
+import java.awt.BasicStroke;
 import java.awt.Component;
+import java.awt.geom.RoundRectangle2D;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Insets;
@@ -125,7 +128,7 @@ public final class ActiveTabColorDecorator {
     }
 
     ActiveTabColorSettingsState.PluginState state = ActiveTabColorSettingsState.getInstance().getState();
-    refreshTabInfo(tabs, previousInfo, false, state);
+    refreshTabInfo(tabs, previousInfo, previousInfo == selectedInfo, state);
     if (selectedInfo != previousInfo) {
       refreshTabInfo(tabs, selectedInfo, true, state);
     }
@@ -164,14 +167,15 @@ public final class ActiveTabColorDecorator {
     Integer backgroundRgb = style.getBackgroundRgb();
     Integer underlineRgb = style.getUnderlineBorderRgb();
     Integer outlineRgb = style.getOutlineBorderRgb();
-    if (backgroundRgb == null && underlineRgb == null && outlineRgb == null) {
+    boolean showDot = state.enabled && state.showActiveTabDot && active;
+    if (style.isEmpty() && !showDot) {
       restoreOriginalBorder(label);
       return;
     }
 
     Border current = label.getBorder();
     Border original = getOriginalBorder(label, current);
-    ActiveTabOverlayBorder overlay = new ActiveTabOverlayBorder(original, backgroundRgb, underlineRgb, outlineRgb);
+    ActiveTabOverlayBorder overlay = new ActiveTabOverlayBorder(original, backgroundRgb, underlineRgb, outlineRgb, style.outlineBorderWidth(), showDot);
     if (!overlay.equals(current)) {
       label.setBorder(overlay);
     }
@@ -202,14 +206,17 @@ public final class ActiveTabColorDecorator {
     }
   }
 
-  private record ActiveTabOverlayBorder(Border delegate,
+  record ActiveTabOverlayBorder(Border delegate,
                                         Integer backgroundRgb,
                                         Integer underlineRgb,
-                                        Integer outlineRgb) implements Border {
-    private ActiveTabOverlayBorder {
+                                        Integer outlineRgb,
+                                        int outlineWidth,
+                                        boolean showDot) implements Border {
+    ActiveTabOverlayBorder {
       backgroundRgb = ActiveTabColorSettingsState.normalizeRgb(backgroundRgb);
       underlineRgb = ActiveTabColorSettingsState.normalizeRgb(underlineRgb);
       outlineRgb = ActiveTabColorSettingsState.normalizeRgb(outlineRgb);
+      outlineWidth = ActiveTabColorSettingsState.normalizeOutlineBorderWidth(outlineWidth);
     }
 
     @Override
@@ -221,10 +228,23 @@ public final class ActiveTabColorDecorator {
         paintRoundedBackground(g, x, y, width, height);
       }
       if (outlineRgb != null) {
-        g.setColor(ColorUtil.fromRgb(outlineRgb));
-        int inset = JBUI.scale(2);
-        int arc = JBUI.scale(8);
-        g.drawRoundRect(x + inset, y + inset, width - 1 - inset * 2, height - 1 - inset * 2, arc, arc);
+        Graphics2D g2 = (Graphics2D)g.create();
+        try {
+          float strokeWidth = JBUI.scale((float)outlineWidth);
+          float inset = JBUI.scale(2) + strokeWidth / 2;
+          float rectWidth = width - inset * 2;
+          float rectHeight = height - inset * 2;
+          if (rectWidth > 0 && rectHeight > 0) {
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(ColorUtil.fromRgb(outlineRgb));
+            g2.setStroke(new BasicStroke(strokeWidth));
+            g2.draw(new RoundRectangle2D.Float(x + inset, y + inset, rectWidth, rectHeight,
+                                             JBUI.scale(8), JBUI.scale(8)));
+          }
+        }
+        finally {
+          g2.dispose();
+        }
       }
       if (underlineRgb != null) {
         int lineHeight = Math.max(1, JBUI.scale(2));
@@ -232,6 +252,21 @@ public final class ActiveTabColorDecorator {
         int inset = JBUI.scale(6);
         int arc = JBUI.scale(4);
         g.fillRoundRect(x + inset, y + height - lineHeight - JBUI.scale(2), width - inset * 2, lineHeight, arc, arc);
+      }
+      if (showDot) {
+        paintDot(g, x, y);
+      }
+    }
+
+    private void paintDot(Graphics g, int x, int y) {
+      Graphics2D g2 = (Graphics2D)g.create();
+      try {
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setColor(JBColor.namedColor("Component.accentColor", JBColor.BLUE));
+        g2.fillOval(x + JBUI.scale(4), y + JBUI.scale(4), JBUI.scale(6), JBUI.scale(6));
+      }
+      finally {
+        g2.dispose();
       }
     }
 

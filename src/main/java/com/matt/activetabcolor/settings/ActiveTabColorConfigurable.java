@@ -26,6 +26,8 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
+import javax.swing.JSpinner;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
@@ -53,6 +55,8 @@ public final class ActiveTabColorConfigurable implements Configurable {
 
   private JPanel rootPanel;
   private JCheckBox enabledCheckBox;
+  private JCheckBox activeOverridesRulesCheckBox;
+  private JCheckBox showActiveTabDotCheckBox;
   private JCheckBox showTabCatCheckBox;
   private JComboBox<CatOption> tabCatComboBox;
   private JLabel tabCatPreviewLabel;
@@ -121,6 +125,8 @@ public final class ActiveTabColorConfigurable implements Configurable {
     }
     ActiveTabColorSettingsState.PluginState state = ActiveTabColorSettingsState.getInstance().getState().copy();
     enabledCheckBox.setSelected(state.enabled);
+    activeOverridesRulesCheckBox.setSelected(state.activeOverridesRules);
+    showActiveTabDotCheckBox.setSelected(state.showActiveTabDot);
     showTabCatCheckBox.setSelected(state.showTabCat);
     selectTabCat(state.tabCat);
     setTabCatScalePercent(state.tabCatScalePercent);
@@ -129,6 +135,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     activeBackground.setRgb(state.active.backgroundRgb);
     activeUnderline.setRgb(state.active.underlineBorderRgb);
     activeOutline.setRgb(state.active.outlineBorderRgb);
+    activeOutline.setWidth(state.active.outlineBorderWidth);
 
     rulesModel.clear();
     if (state.rules != null) {
@@ -155,12 +162,22 @@ public final class ActiveTabColorConfigurable implements Configurable {
     panel.setBorder(BorderFactory.createTitledBorder("Active tab"));
     activeBackground = new ColorRow("Background");
     activeUnderline = new ColorRow("Underline border");
-    activeOutline = new ColorRow("Outline border");
+    activeOutline = new ColorRow("Outline border", true);
 
     addColorRow(panel, activeBackground, 0);
     addColorRow(panel, activeUnderline, 1);
     addColorRow(panel, activeOutline, 2);
-    addVerticalFiller(panel, 3);
+    activeOverridesRulesCheckBox = new JBCheckBox("Active tab styles override rules");
+    activeOverridesRulesCheckBox.setToolTipText("When unchecked, rule styles take priority; missing items use active tab styles.");
+    showActiveTabDotCheckBox = new JBCheckBox("Show active tab dot");
+    GridBagConstraints c = baseConstraints();
+    c.gridx = 0;
+    c.gridy = 3;
+    c.gridwidth = 2;
+    panel.add(activeOverridesRulesCheckBox, c);
+    c.gridy = 4;
+    panel.add(showActiveTabDotCheckBox, c);
+    addVerticalFiller(panel, 5);
     return panel;
   }
 
@@ -418,7 +435,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     rulePattern = new JBTextField(RULE_TEXT_FIELD_COLUMNS);
     ruleBackground = new ColorRow("Background");
     ruleUnderline = new ColorRow("Underline border");
-    ruleOutline = new ColorRow("Outline border");
+    ruleOutline = new ColorRow("Outline border", true);
 
     ruleEnabled.addActionListener(e -> updateSelectedRule());
     installDocumentListener(ruleName);
@@ -514,6 +531,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     ruleBackground.setRgb(rule == null ? null : rule.backgroundRgb);
     ruleUnderline.setRgb(rule == null ? null : rule.underlineBorderRgb);
     ruleOutline.setRgb(rule == null ? null : rule.outlineBorderRgb);
+    ruleOutline.setWidth(rule == null ? 1 : rule.outlineBorderWidth);
     loadingRule = false;
   }
 
@@ -531,12 +549,15 @@ public final class ActiveTabColorConfigurable implements Configurable {
     rule.backgroundRgb = ruleBackground.getRgb();
     rule.underlineBorderRgb = ruleUnderline.getRgb();
     rule.outlineBorderRgb = ruleOutline.getRgb();
+    rule.outlineBorderWidth = ruleOutline.getWidth();
     rulesList.repaint();
   }
 
   private ActiveTabColorSettingsState.PluginState readStateFromUi() {
     ActiveTabColorSettingsState.PluginState state = new ActiveTabColorSettingsState.PluginState();
     state.enabled = enabledCheckBox.isSelected();
+    state.activeOverridesRules = activeOverridesRulesCheckBox.isSelected();
+    state.showActiveTabDot = showActiveTabDotCheckBox.isSelected();
     state.showTabCat = showTabCatCheckBox.isSelected();
     CatOption tabCat = (CatOption)tabCatComboBox.getSelectedItem();
     state.tabCat = tabCat == null ? ActiveTabColorSettingsState.DEFAULT_TAB_CAT : tabCat.id;
@@ -545,6 +566,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     state.active.backgroundRgb = activeBackground.getRgb();
     state.active.underlineBorderRgb = activeUnderline.getRgb();
     state.active.outlineBorderRgb = activeOutline.getRgb();
+    state.active.outlineBorderWidth = activeOutline.getWidth();
 
     for (int i = 0; i < rulesModel.size(); i++) {
       state.rules.add(rulesModel.get(i).toRule());
@@ -642,6 +664,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     private Integer backgroundRgb;
     private Integer underlineBorderRgb;
     private Integer outlineBorderRgb;
+    private int outlineBorderWidth = 1;
 
     private static RuleModel fromRule(ActiveTabColorSettingsState.TabColorRule rule) {
       RuleModel model = new RuleModel();
@@ -651,6 +674,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
       model.backgroundRgb = rule.backgroundRgb;
       model.underlineBorderRgb = rule.underlineBorderRgb;
       model.outlineBorderRgb = rule.outlineBorderRgb;
+      model.outlineBorderWidth = rule.outlineBorderWidth;
       return model;
     }
 
@@ -662,6 +686,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
       rule.backgroundRgb = backgroundRgb;
       rule.underlineBorderRgb = underlineBorderRgb;
       rule.outlineBorderRgb = outlineBorderRgb;
+      rule.outlineBorderWidth = outlineBorderWidth;
       return rule;
     }
 
@@ -735,9 +760,23 @@ public final class ActiveTabColorConfigurable implements Configurable {
     private final JCheckBox useCheckBox = new JBCheckBox();
     private final ColorPanel colorPanel = new ColorPanel();
     private final JButton clearButton = new JButton("Clear");
+    private final JSpinner widthSpinner;
     private Runnable onChange;
 
     private ColorRow(String label) {
+      this(label, false);
+    }
+
+    private ColorRow(String label, boolean outline) {
+      widthSpinner = outline ? new JSpinner(new SpinnerNumberModel(1, 1, 6, 1)) : null;
+      if (widthSpinner != null) {
+        widthSpinner.getAccessibleContext().setAccessibleName("Outline border width");
+        widthSpinner.setToolTipText("Outline border width (1–6 logical pixels)");
+        // Commit valid typed values immediately so Apply also captures edits without focus loss.
+        ((javax.swing.text.DefaultFormatter)((JSpinner.DefaultEditor)widthSpinner.getEditor())
+          .getTextField().getFormatter()).setCommitsOnValidEdit(true);
+        widthSpinner.addChangeListener(e -> notifyChanged());
+      }
       JLabel labelComponent = new JLabel(label);
       panel.setMinimumSize(new Dimension(0, 0));
       colorPanel.setEditable(true);
@@ -773,8 +812,12 @@ public final class ActiveTabColorConfigurable implements Configurable {
       c.gridx = 2;
       panel.add(colorPanel, c);
       c.gridx = 3;
+      if (widthSpinner != null) {
+        panel.add(widthSpinner, c);
+        c.gridx++;
+      }
       panel.add(clearButton, c);
-      c.gridx = 4;
+      c.gridx++;
       c.weightx = 1;
       c.fill = GridBagConstraints.HORIZONTAL;
       panel.add(createZeroSizePanel(), c);
@@ -796,6 +839,14 @@ public final class ActiveTabColorConfigurable implements Configurable {
       updateEnabled();
     }
 
+    private void setWidth(int width) {
+      widthSpinner.setValue(ActiveTabColorSettingsState.normalizeOutlineBorderWidth(width));
+    }
+
+    private int getWidth() {
+      return (Integer)widthSpinner.getValue();
+    }
+
     private Integer getRgb() {
       return useCheckBox.isSelected() ? ColorUtil.toRgb(colorPanel.getSelectedColor()) : null;
     }
@@ -807,7 +858,11 @@ public final class ActiveTabColorConfigurable implements Configurable {
     }
 
     private void updateEnabled() {
-      colorPanel.setEnabled(useCheckBox.isEnabled() && useCheckBox.isSelected());
+      boolean enabled = useCheckBox.isEnabled() && useCheckBox.isSelected();
+      colorPanel.setEnabled(enabled);
+      if (widthSpinner != null) {
+        widthSpinner.setEnabled(enabled);
+      }
     }
 
     private void notifyChanged() {

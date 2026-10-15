@@ -31,6 +31,14 @@ The plugin has been verified with IntelliJ IDEA Community `2024.1.7` and Intelli
 - Choose from multiple tab cat sprite sets.
 - The plugin does not change tab appearance by default. Colors are applied only after you manually enable a color item and choose a color.
 
+### Outline width and selection
+
+Both active tab and rule `Outline border` color controls include a width spinner (1–6 logical pixels, default 1, scaled with the IDE). The spinner is enabled only when the outline color is enabled.
+
+`Active tab styles override rules` is enabled by default. When disabled, rule styles take priority and missing items use active tab styles. Outline color and width are inherited together.
+
+`Show active tab dot` is disabled by default. When enabled, each split's selected tab shows a theme accent dot in its top-left corner, even without configured colors. Disabling tab color customization hides the dot.
+
 ## Settings
 
 After installing the plugin, open:
@@ -93,7 +101,7 @@ Example:
 
 This matches tab names containing `Service`, such as `UserService.java` or `OrderService.kt`.
 
-If an active tab also matches a rule:
+With `Active tab styles override rules` enabled (the default), if an active tab also matches a rule:
 
 - Configured active tab color options take priority.
 - Active tab options that are not configured can still use the matching rule's colors.

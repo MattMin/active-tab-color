@@ -91,4 +91,48 @@ class ActiveTabColorSettingsStateTest {
     tooFast.tabCatSpeedPercent = 300;
     assertEquals(200, tooFast.copy().tabCatSpeedPercent);
   }
+  @Test
+  void newSettingsKeepCompatibleDefaultsAndCopyAllFields() {
+    var state = new ActiveTabColorSettingsState.PluginState();
+    assertTrue(state.activeOverridesRules);
+    assertFalse(state.showActiveTabDot);
+    assertEquals(1, state.active.outlineBorderWidth);
+    var rule = new ActiveTabColorSettingsState.TabColorRule();
+    assertEquals(1, rule.outlineBorderWidth);
+    state.rules.add(rule);
+    state.activeOverridesRules = false;
+    state.showActiveTabDot = true;
+    state.active.outlineBorderWidth = 4;
+    rule.outlineBorderWidth = 6;
+    var copy = state.copy();
+    assertEquals(state, copy);
+    assertEquals(state.hashCode(), copy.hashCode());
+    assertEquals(4, copy.active.outlineBorderWidth);
+    assertEquals(6, copy.rules.get(0).outlineBorderWidth);
+    copy.activeOverridesRules = true;
+    assertNotEquals(state, copy);
+    copy = state.copy();
+    copy.showActiveTabDot = false;
+    assertNotEquals(state, copy);
+    copy = state.copy();
+    copy.active.outlineBorderWidth = 2;
+    assertNotEquals(state, copy);
+    copy = state.copy();
+    copy.rules.get(0).outlineBorderWidth = 2;
+    assertNotEquals(state, copy);
+  }
+
+  @Test
+  void outlineWidthsAreClampedWhenLoadingState() {
+    var state = new ActiveTabColorSettingsState.PluginState();
+    state.active.outlineBorderWidth = 0;
+    var rule = new ActiveTabColorSettingsState.TabColorRule();
+    rule.outlineBorderWidth = 99;
+    state.rules.add(rule);
+    var service = new ActiveTabColorSettingsState();
+    service.loadState(state);
+    assertEquals(1, service.getState().active.outlineBorderWidth);
+    assertEquals(6, service.getState().rules.get(0).outlineBorderWidth);
+    assertEquals(3, ActiveTabColorSettingsState.normalizeOutlineBorderWidth(3));
+  }
 }

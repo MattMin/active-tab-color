@@ -31,6 +31,14 @@ Active Tab Color 是一个 IntelliJ-based 插件，用于自定义编辑器 tab 
 - 小猫素材支持从多个小猫中选择。
 - 插件首次启用时不会修改任何 tab 样式，只有手动勾选并选择颜色后才会生效。
 
+### 外框粗细与选中状态
+
+`Active tab` 和规则的 `Outline border` 颜色后均可设置粗细（1–6 个逻辑像素，默认 1，随 IDE 显示缩放）。启用外框颜色后才能编辑粗细。
+
+`Active tab styles override rules` 默认开启，选中样式优先；关闭后规则优先，规则未配置的项仍使用选中样式。外框颜色和粗细一起继承。
+
+`Show active tab dot` 默认关闭。开启后，每个分屏选中 Tab 的左上角显示主题强调色圆点，即使没有配置颜色也可显示。关闭颜色定制总开关时圆点隐藏。
+
 ## 设置入口
 
 安装插件后，在 IDE 中打开：
@@ -95,7 +103,7 @@ README.md
 
 这个规则会匹配所有 tab 名称中包含 `Service` 的文件，例如 `UserService.java`、`OrderService.kt`。
 
-如果一个 active tab 同时命中了 active 配置和规则配置：
+默认开启 `Active tab styles override rules` 时，如果一个 active tab 同时命中了 active 配置和规则配置：
 
 - active tab 中已勾选的颜色项优先。
 - active tab 中未勾选的颜色项可以继续使用命中的规则颜色。
