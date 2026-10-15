@@ -1,7 +1,12 @@
 package com.matt.activetabcolor.settings;
 
+import com.intellij.openapi.fileChooser.FileChooser;
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
+import com.intellij.openapi.fileChooser.FileChooserFactory;
+import com.intellij.openapi.fileChooser.FileSaverDescriptor;
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.options.ConfigurationException;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.ui.ColorPanel;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.components.JBCheckBox;
@@ -37,12 +42,16 @@ import javax.swing.event.DocumentListener;
 import java.awt.BorderLayout;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Image;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Hashtable;
 import java.util.Objects;
 import java.util.regex.PatternSyntaxException;
@@ -95,6 +104,7 @@ public final class ActiveTabColorConfigurable implements Configurable {
     content.add(createActivePanel(), BorderLayout.NORTH);
     content.add(createRulesPanel(), BorderLayout.CENTER);
     rootPanel.add(content, BorderLayout.CENTER);
+    rootPanel.add(createTransferPanel(), BorderLayout.SOUTH);
 
     reset();
     return rootPanel;
@@ -123,7 +133,10 @@ public final class ActiveTabColorConfigurable implements Configurable {
     if (rootPanel == null) {
       return;
     }
-    ActiveTabColorSettingsState.PluginState state = ActiveTabColorSettingsState.getInstance().getState().copy();
+    fillUi(ActiveTabColorSettingsState.getInstance().getState().copy());
+  }
+
+  private void fillUi(ActiveTabColorSettingsState.PluginState state) {
     enabledCheckBox.setSelected(state.enabled);
     activeOverridesRulesCheckBox.setSelected(state.activeOverridesRules);
     showActiveTabDotCheckBox.setSelected(state.showActiveTabDot);
@@ -154,6 +167,68 @@ public final class ActiveTabColorConfigurable implements Configurable {
   @Override
   public void disposeUIResources() {
     rootPanel = null;
+  }
+
+  private JComponent createTransferPanel() {
+    JPanel panel = new JPanel(new BorderLayout());
+    panel.setBorder(JBUI.Borders.emptyTop(8));
+    JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0));
+    JButton export = new JButton("Export Settings…");
+    JButton importSettings = new JButton("Import Settings…");
+    export.addActionListener(e -> exportSettings());
+    importSettings.addActionListener(e -> importSettings());
+    buttons.add(export);
+    buttons.add(importSettings);
+    panel.add(buttons, BorderLayout.NORTH);
+    JTextArea help = new JTextArea("Export backs up saved settings only. Import replaces this page.\n"
+                                  + "Click Apply/OK to save imported settings, or Cancel to discard them.");
+    help.setEditable(false);
+    help.setRows(2);
+    help.setOpaque(false);
+    help.setLineWrap(true);
+    help.setWrapStyleWord(true);
+    help.setFont(new JLabel().getFont());
+    panel.add(help, BorderLayout.CENTER);
+    return panel;
+  }
+
+  private void exportSettings() {
+    var descriptor = new FileSaverDescriptor("Export Active Tab Color Settings", "Save the current saved configuration", "json");
+    var file = FileChooserFactory.getInstance().createSaveFileDialog(descriptor, rootPanel)
+      .save("active-tab-color-settings.json");
+    if (file == null) {
+      return;
+    }
+    Path path = file.getFile().toPath();
+    if (Files.exists(path) && Messages.showYesNoDialog(rootPanel, "Replace the existing configuration file?",
+        "Export Active Tab Color Settings", Messages.getQuestionIcon()) != Messages.YES) {
+      return;
+    }
+    try {
+      SettingsFile.write(path, ActiveTabColorSettingsState.getInstance().getState().copy());
+      Messages.showInfoMessage(rootPanel, "Saved settings exported successfully.", "Export Active Tab Color Settings");
+    }
+    catch (IOException e) {
+      Messages.showErrorDialog(rootPanel, "Could not export settings: " + e.getMessage(), "Export Active Tab Color Settings");
+    }
+  }
+
+  private void importSettings() {
+    var descriptor = FileChooserDescriptorFactory.createSingleLocalFileDescriptor();
+    descriptor.setTitle("Import Active Tab Color Settings");
+    var file = FileChooser.chooseFile(descriptor, rootPanel, null, null);
+    if (file == null) {
+      return;
+    }
+    try {
+      var imported = SettingsFile.read(file.toNioPath());
+      fillUi(imported);
+      Messages.showInfoMessage(rootPanel, "Settings imported into this page. Click Apply/OK to save, or Cancel to discard.",
+                               "Import Active Tab Color Settings");
+    }
+    catch (IOException e) {
+      Messages.showErrorDialog(rootPanel, "Could not import settings: " + e.getMessage(), "Import Active Tab Color Settings");
+    }
   }
 
   private JComponent createActivePanel() {

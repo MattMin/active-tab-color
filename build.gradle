@@ -46,6 +46,7 @@ patchPluginXml {
         <li>Add configurable outline border width (1–6 logical pixels) for active tabs and rules.</li>
         <li>Add an option to let rule styles take priority over active tab styles.</li>
         <li>Add an optional theme accent dot to mark the selected tab in each editor split.</li>
+        <li>Add JSON export and import for saved plugin settings, with configuration validation and error messages for invalid files. Imported settings are saved with Apply/OK.</li>
       </ul>
     """
 }

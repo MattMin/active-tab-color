@@ -49,6 +49,12 @@ Settings > Tools > Active Tab Color
 
 进入配置页面。
 
+## 导出与导入配置
+
+- `Export Settings…`：将全部已保存的插件配置导出为 UTF-8 JSON 文件，默认文件名为 `active-tab-color-settings.json`，不包含尚未 Apply 的编辑。可选择电脑上的保存位置，覆盖已有文件时需要确认。
+- `Import Settings…`：选择本功能导出的配置文件，完整替换设置页内容，包含全部规则及顺序。点击 `Apply`/`OK` 才保存并刷新所有项目，点击 `Cancel` 可放弃导入。
+- 文件格式或配置内容不合法时显示错误，并保留设置页内容和已保存配置。取消文件选择不会产生变更。
+
 ## Tab Cat 小猫
 
 勾选 `Show tab cat` 后，会在编辑器 tab 栏上显示一只动画小猫。

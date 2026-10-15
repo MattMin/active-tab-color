@@ -47,6 +47,12 @@ After installing the plugin, open:
 Settings > Tools > Active Tab Color
 ```
 
+## Export and Import Settings
+
+- `Export Settings…` saves all saved plugin settings to a UTF-8 JSON file (default: `active-tab-color-settings.json`). Pending edits are excluded. Choose a location on your computer and confirm before overwriting an existing file.
+- `Import Settings…` opens a configuration file exported by this feature. It replaces the settings page, including all rules and their order. Click `Apply`/`OK` to save and refresh all projects, or `Cancel` to discard the import.
+- Invalid files show an error and leave both the settings page and saved configuration unchanged. Cancelling the file dialog makes no changes.
+
 ## Tab Cat
 
 The `Show tab cat` option enables an animated cat on the editor tab bar.
