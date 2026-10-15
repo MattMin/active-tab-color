@@ -6,7 +6,7 @@ plugins {
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 
 group = 'com.matt'
-version = '1.0.1'
+version = '1.1.0'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -41,9 +41,11 @@ patchPluginXml {
     sinceBuild = '241.19416.15'
     untilBuild = provider { null }
     changeNotes = """
-      <h3>1.0.1</h3>
+      <h3>1.1.0</h3>
       <ul>
-        <li>Add configurable Tab Cat movement speed.</li>
+        <li>Add configurable outline border width (1–6 logical pixels) for active tabs and rules.</li>
+        <li>Add an option to let rule styles take priority over active tab styles.</li>
+        <li>Add an optional theme accent dot to mark the selected tab in each editor split.</li>
       </ul>
     """
 }
