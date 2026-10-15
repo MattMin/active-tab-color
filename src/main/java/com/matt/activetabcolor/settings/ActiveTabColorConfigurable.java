@@ -816,10 +816,10 @@ public final class ActiveTabColorConfigurable implements Configurable {
 
     private static Dimension scaledSize(int width, int height, int maxWidth, int maxHeight) {
       if (width <= 0 || height <= 0) {
-        return JBUI.size(maxWidth, maxHeight);
+        return new Dimension(maxWidth, maxHeight);
       }
       double scale = Math.min(maxWidth / (double)width, maxHeight / (double)height);
-      return JBUI.size(Math.max(1, (int)Math.round(width * scale)), Math.max(1, (int)Math.round(height * scale)));
+      return new Dimension(Math.max(1, (int)Math.round(width * scale)), Math.max(1, (int)Math.round(height * scale)));
     }
 
     @Override

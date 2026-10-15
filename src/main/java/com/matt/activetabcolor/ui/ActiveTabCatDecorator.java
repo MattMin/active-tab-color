@@ -1,13 +1,17 @@
 package com.matt.activetabcolor.ui;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Disposer;
 import com.intellij.ui.tabs.JBTabs;
 import com.intellij.ui.tabs.TabInfo;
 import com.intellij.util.concurrency.EdtExecutorService;
 import com.intellij.util.ui.JBUI;
+import com.intellij.util.ui.UIUtil;
 import com.matt.activetabcolor.settings.ActiveTabColorSettingsState;
 
 import javax.imageio.ImageIO;
@@ -39,7 +43,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-public final class ActiveTabCatDecorator {
+@Service(Service.Level.APP)
+public final class ActiveTabCatDecorator implements Disposable {
   private static final Logger LOG = Logger.getInstance(ActiveTabCatDecorator.class);
   private static final String CAT_OVERLAY_KEY = "activeTabColor.catOverlay";
   private static final int TIMER_DELAY_MILLIS = 30;
@@ -54,15 +59,23 @@ public final class ActiveTabCatDecorator {
   private static final int BLINK_DURATION_MILLIS = 500;
   private static final Map<String, CatSprites> CAT_SPRITES = new ConcurrentHashMap<>();
 
-  private ActiveTabCatDecorator() {
+  private volatile boolean disposed;
+
+  public ActiveTabCatDecorator() {
+  }
+
+  @Override
+  public void dispose() {
+    disposed = true;
   }
 
   public static void refreshProject(Project project) {
     if (project == null || project.isDisposed()) {
       return;
     }
+    ActiveTabCatDecorator owner = ApplicationManager.getApplication().getService(ActiveTabCatDecorator.class);
     Runnable refresh = () -> {
-      if (project.isDisposed()) {
+      if (project.isDisposed() || owner.disposed) {
         return;
       }
       JComponent component = FileEditorManagerEx.getInstanceEx(project).getComponent();
@@ -81,8 +94,13 @@ public final class ActiveTabCatDecorator {
     if (project == null || project.isDisposed()) {
       return;
     }
+    ActiveTabCatDecorator owner = ApplicationManager.getApplication().getService(ActiveTabCatDecorator.class);
     EdtExecutorService.getScheduledExecutorInstance().schedule(
-      () -> refreshProject(project),
+      () -> {
+        if (!owner.disposed) {
+          refreshProject(project);
+        }
+      },
       delayMillis,
       TimeUnit.MILLISECONDS
     );
@@ -121,7 +139,8 @@ public final class ActiveTabCatDecorator {
     if (saved instanceof CatOverlay overlay && !overlay.isDisposed()) {
       return overlay;
     }
-    CatOverlay overlay = new CatOverlay(tabsComponent);
+    CatOverlay overlay = new CatOverlay(tabsComponent,
+      ApplicationManager.getApplication().getService(ActiveTabCatDecorator.class));
     tabsComponent.putClientProperty(CAT_OVERLAY_KEY, overlay);
     return overlay;
   }
@@ -129,20 +148,22 @@ public final class ActiveTabCatDecorator {
   private static void removeOverlay(JComponent tabsComponent) {
     Object saved = tabsComponent.getClientProperty(CAT_OVERLAY_KEY);
     if (saved instanceof CatOverlay overlay) {
-      overlay.dispose();
+      Disposer.dispose(overlay);
     }
   }
 
-  private static final class CatOverlay extends JComponent {
+  private static final class CatOverlay extends JComponent implements Disposable {
     private final JComponent tabsComponent;
     private final Timer animationTimer;
     private final Timer blinkStartTimer;
     private final Timer blinkFinishTimer;
     private final ComponentAdapter componentListener;
+    private final ComponentAdapter labelListener;
     private final HierarchyBoundsAdapter hierarchyBoundsListener;
     private final HierarchyListener hierarchyListener;
     private JLayeredPane layeredPane;
     private JBTabs lastTabs;
+    private Component selectedLabel;
     private double currentX;
     private double currentY;
     private int targetX;
@@ -155,7 +176,7 @@ public final class ActiveTabCatDecorator {
     private boolean disposed;
     private CatPose pose = CatPose.SITTING;
 
-    private CatOverlay(JComponent tabsComponent) {
+    private CatOverlay(JComponent tabsComponent, Disposable owner) {
       this.tabsComponent = tabsComponent;
       setOpaque(false);
       setFocusable(false);
@@ -182,7 +203,28 @@ public final class ActiveTabCatDecorator {
 
         @Override
         public void componentHidden(ComponentEvent e) {
-          dispose();
+          Disposer.dispose(CatOverlay.this);
+        }
+      };
+      labelListener = new ComponentAdapter() {
+        @Override
+        public void componentMoved(ComponentEvent e) {
+          scheduleTargetRefresh();
+        }
+
+        @Override
+        public void componentResized(ComponentEvent e) {
+          scheduleTargetRefresh();
+        }
+
+        @Override
+        public void componentShown(ComponentEvent e) {
+          scheduleTargetRefresh();
+        }
+
+        @Override
+        public void componentHidden(ComponentEvent e) {
+          scheduleTargetRefresh();
         }
       };
       hierarchyBoundsListener = new HierarchyBoundsAdapter() {
@@ -201,12 +243,13 @@ public final class ActiveTabCatDecorator {
           return;
         }
         if (!tabsComponent.isShowing() || !tabsComponent.isDisplayable()) {
-          dispose();
+          Disposer.dispose(CatOverlay.this);
         }
       };
       tabsComponent.addComponentListener(componentListener);
       tabsComponent.addHierarchyBoundsListener(hierarchyBoundsListener);
       tabsComponent.addHierarchyListener(hierarchyListener);
+      Disposer.register(owner, this);
     }
 
     private void refresh(JBTabs tabs) {
@@ -215,15 +258,17 @@ public final class ActiveTabCatDecorator {
       }
       lastTabs = tabs;
       if (!tabsComponent.isShowing()) {
-        dispose();
+        Disposer.dispose(this);
         return;
       }
       JLayeredPane pane = findLayeredPane(tabsComponent);
       if (pane == null) {
-        dispose();
+        Disposer.dispose(this);
         return;
       }
       installOn(pane);
+      TabInfo selectedInfo = tabs.getSelectedInfo();
+      observeSelectedLabel(selectedInfo == null ? null : tabs.getTabLabel(selectedInfo));
 
       Point target = findCatTarget(tabs, pane);
       if (target == null) {
@@ -235,6 +280,19 @@ public final class ActiveTabCatDecorator {
       }
       setVisible(true);
       moveTo(target.x, target.y);
+    }
+
+    private void observeSelectedLabel(Component label) {
+      if (selectedLabel == label) {
+        return;
+      }
+      if (selectedLabel != null) {
+        selectedLabel.removeComponentListener(labelListener);
+      }
+      selectedLabel = label;
+      if (selectedLabel != null) {
+        selectedLabel.addComponentListener(labelListener);
+      }
     }
 
     private void installOn(JLayeredPane pane) {
@@ -256,7 +314,8 @@ public final class ActiveTabCatDecorator {
         return null;
       }
       Component label = tabs.getTabLabel(selectedInfo);
-      if (label == null || !label.isShowing() || label.getParent() == null) {
+      if (label == null || !label.isShowing() || label.getParent() == null ||
+          label.getWidth() <= 0 || label.getHeight() <= 0) {
         return null;
       }
       Rectangle labelBounds = SwingUtilities.convertRectangle(label.getParent(), label.getBounds(), pane);
@@ -485,7 +544,12 @@ public final class ActiveTabCatDecorator {
       );
     }
 
-    private void dispose() {
+    @Override
+    public void dispose() {
+      UIUtil.invokeAndWaitIfNeeded(this::disposeOnEdt);
+    }
+
+    private void disposeOnEdt() {
       if (disposed) {
         return;
       }
@@ -499,6 +563,7 @@ public final class ActiveTabCatDecorator {
       tabsComponent.removeComponentListener(componentListener);
       tabsComponent.removeHierarchyBoundsListener(hierarchyBoundsListener);
       tabsComponent.removeHierarchyListener(hierarchyListener);
+      observeSelectedLabel(null);
       if (tabsComponent.getClientProperty(CAT_OVERLAY_KEY) == this) {
         tabsComponent.putClientProperty(CAT_OVERLAY_KEY, null);
       }
